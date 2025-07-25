@@ -1,0 +1,264 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* Custom styles for VendorCircle */
+.App {
+  min-height: 100vh;
+}
+
+/* Mobile-first optimizations */
+@media (max-width: 768px) {
+  .mobile-padding {
+    padding-bottom: 80px; /* Space for bottom navigation */
+  }
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Loading spinner */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Custom scrollbar for chat */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Status indicators */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-online {
+  background-color: #10b981;
+}
+
+.status-offline {
+  background-color: #6b7280;
+}
+
+.status-pending {
+  background-color: #f59e0b;
+}
+
+/* Card hover effects */
+.hover-lift {
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Credit score display */
+.trust-score-excellent {
+  color: #059669;
+  background-color: #ecfdf5;
+}
+
+.trust-score-good {
+  color: #0891b2;
+  background-color: #f0f9ff;
+}
+
+.trust-score-average {
+  color: #d97706;
+  background-color: #fffbeb;
+}
+
+.trust-score-poor {
+  color: #dc2626;
+  background-color: #fef2f2;
+}
+
+/* Payment method icons */
+.payment-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.payment-upi {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.payment-cash {
+  background-color: #10b981;
+  color: white;
+}
+
+.payment-credit {
+  background-color: #f59e0b;
+  color: white;
+}
+
+/* Group status badges */
+.group-forming {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.group-confirmed {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.group-bidding {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.group-completed {
+  background-color: #f3e8ff;
+  color: #7c3aed;
+}
+
+/* Responsive text sizing */
+@media (max-width: 640px) {
+  .responsive-text-lg {
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
+  
+  .responsive-text-xl {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+  }
+  
+  .responsive-text-2xl {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+  }
+}
+
+/* Chat bubbles */
+.chat-bubble-sent {
+  background-color: #3b82f6;
+  color: white;
+  border-radius: 1rem 1rem 0.25rem 1rem;
+  margin-left: auto;
+  max-width: 80%;
+}
+
+.chat-bubble-received {
+  background-color: #f3f4f6;
+  color: #1f2937;
+  border-radius: 1rem 1rem 1rem 0.25rem;
+  margin-right: auto;
+  max-width: 80%;
+}
+
+/* Quick action buttons */
+.quick-action-btn {
+  min-height: 60px;
+  transition: all 0.2s ease-in-out;
+  border: 2px solid transparent;
+}
+
+.quick-action-btn:hover {
+  border-color: #3b82f6;
+  transform: scale(1.02);
+}
+
+.quick-action-btn:active {
+  transform: scale(0.98);
+}
+
+/* Progress bars */
+.progress-bar {
+  height: 8px;
+  border-radius: 4px;
+  background-color: #e5e7eb;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: #3b82f6;
+  transition: width 0.3s ease-in-out;
+}
+
+/* Notification badge */
+.notification-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background-color: #ef4444;
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+/* Loading states */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+} 

@@ -1,0 +1,368 @@
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Vendor {
+  id                String   @id @default(cuid())
+  phone             String   @unique
+  name              String
+  businessType      String   // Chaat, Dosa, Pav Bhaji, etc.
+  businessLocation  String
+  latitude          Float?
+  longitude         Float?
+  operatingHours    String?
+  estimatedDailyPurchase Float?
+  profilePicture    String?
+  isVerified        Boolean  @default(false)
+  trustScore        Int      @default(100)
+  availableCredit   Float    @default(5000)
+  usedCredit        Float    @default(0)
+  totalSavings      Float    @default(0)
+  phoneVerifiedAt   DateTime?
+  locationVerifiedAt DateTime?
+  bankAccount       String?
+  upiId             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  orders            Order[]
+  groupMemberships  GroupMembership[]
+  payments          Payment[]
+  creditTransactions CreditTransaction[]
+  ratings           Rating[] @relation("VendorRatings")
+  givenRatings      Rating[] @relation("VendorGivenRatings")
+  chatMessages      ChatMessage[]
+
+  @@map("vendors")
+}
+
+model Supplier {
+  id                String   @id @default(cuid())
+  phone             String   @unique
+  businessName      String
+  businessRegNumber String?
+  gstNumber         String?
+  contactPerson     String
+  email             String?
+  deliveryAreas     String[] // JSON array of areas
+  productCategories String[] // JSON array of categories
+  bankAccount       String
+  businessAddress   String
+  latitude          Float?
+  longitude         Float?
+  isVerified        Boolean  @default(false)
+  rating            Float    @default(5.0)
+  totalOrders       Int      @default(0)
+  profilePicture    String?
+  businessPhotos    String[] // Array of photo URLs
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  orders            Order[]
+  bids              Bid[]
+  ratings           Rating[] @relation("SupplierRatings")
+
+  @@map("suppliers")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  category    String
+  unit        String   // kg, pieces, liters, etc.
+  description String?
+  imageUrl    String?
+  marketPrice Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  orderItems  OrderItem[]
+
+  @@map("products")
+}
+
+model BuyingGroup {
+  id                String   @id @default(cuid())
+  name              String?
+  status            GroupStatus @default(FORMING)
+  targetPickupTime  DateTime
+  pickupLocation    String
+  pickupLatitude    Float?
+  pickupLongitude   Float?
+  minMembers        Int      @default(3)
+  maxMembers        Int      @default(20)
+  totalValue        Float    @default(0)
+  estimatedSavings  Float    @default(0)
+  confirmationDeadline DateTime
+  isPaymentMixed    Boolean  @default(true) // mix of pay-now and pay-later
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  memberships       GroupMembership[]
+  orders            Order[]
+  chatMessages      ChatMessage[]
+
+  @@map("buying_groups")
+}
+
+model GroupMembership {
+  id        String   @id @default(cuid())
+  vendorId  String
+  groupId   String
+  joinedAt  DateTime @default(now())
+  isConfirmed Boolean @default(false)
+  
+  // Relations
+  vendor    Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  group     BuyingGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, groupId])
+  @@map("group_memberships")
+}
+
+model Order {
+  id              String   @id @default(cuid())
+  vendorId        String?
+  supplierId      String?
+  groupId         String?
+  orderType       OrderType
+  status          OrderStatus @default(PENDING)
+  totalAmount     Float
+  paymentMethod   PaymentMethod
+  paymentStatus   PaymentStatus @default(PENDING)
+  isGroupOrder    Boolean  @default(false)
+  pickupTime      DateTime?
+  deliveredAt     DateTime?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  vendor          Vendor?  @relation(fields: [vendorId], references: [id])
+  supplier        Supplier? @relation(fields: [supplierId], references: [id])
+  group           BuyingGroup? @relation(fields: [groupId], references: [id])
+  items           OrderItem[]
+  payments        Payment[]
+  bids            Bid[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String   @id @default(cuid())
+  orderId     String
+  productId   String
+  quantity    Float
+  unit        String
+  pricePerUnit Float
+  totalPrice  Float
+  notes       String?
+
+  // Relations
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model Bid {
+  id              String   @id @default(cuid())
+  orderId         String
+  supplierId      String
+  totalAmount     Float
+  message         String?
+  deliveryTime    DateTime
+  validUntil      DateTime
+  status          BidStatus @default(PENDING)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  supplier        Supplier @relation(fields: [supplierId], references: [id])
+
+  @@map("bids")
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  vendorId        String
+  orderId         String?
+  amount          Float
+  type            PaymentType
+  method          PaymentMethod
+  status          PaymentStatus @default(PENDING)
+  razorpayPaymentId String?
+  razorpayOrderId String?
+  dueDate         DateTime?
+  paidAt          DateTime?
+  failureReason   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  vendor          Vendor   @relation(fields: [vendorId], references: [id])
+  order           Order?   @relation(fields: [orderId], references: [id])
+
+  @@map("payments")
+}
+
+model CreditTransaction {
+  id              String   @id @default(cuid())
+  vendorId        String
+  amount          Float
+  type            CreditTransactionType
+  description     String
+  orderId         String?
+  interestRate    Float?
+  dueDate         DateTime?
+  paidAt          DateTime?
+  status          CreditStatus @default(ACTIVE)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  vendor          Vendor   @relation(fields: [vendorId], references: [id])
+
+  @@map("credit_transactions")
+}
+
+model Rating {
+  id          String   @id @default(cuid())
+  fromVendorId String?
+  toVendorId  String?
+  supplierId  String?
+  orderId     String?
+  rating      Int      // 1-5 stars
+  comment     String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  fromVendor  Vendor?  @relation("VendorGivenRatings", fields: [fromVendorId], references: [id])
+  toVendor    Vendor?  @relation("VendorRatings", fields: [toVendorId], references: [id])
+  supplier    Supplier? @relation("SupplierRatings", fields: [supplierId], references: [id])
+
+  @@map("ratings")
+}
+
+model ChatMessage {
+  id          String   @id @default(cuid())
+  groupId     String
+  vendorId    String
+  message     String
+  messageType MessageType @default(TEXT)
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  group       BuyingGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  vendor      Vendor   @relation(fields: [vendorId], references: [id])
+
+  @@map("chat_messages")
+}
+
+model AdminUser {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String
+  role        AdminRole @default(ADMIN)
+  isActive    Boolean  @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("admin_users")
+}
+
+// Enums
+enum GroupStatus {
+  FORMING
+  CONFIRMED
+  BIDDING
+  ORDERED
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderType {
+  INDIVIDUAL
+  GROUP
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY_FOR_PICKUP
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  PAY_NOW
+  PAY_LATER
+  UPI
+  CARD
+  BANK_TRANSFER
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentType {
+  ORDER_PAYMENT
+  CREDIT_REPAYMENT
+  REFUND
+  PENALTY
+}
+
+enum BidStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum CreditTransactionType {
+  CREDIT_USED
+  CREDIT_REPAID
+  CREDIT_LIMIT_INCREASE
+  INTEREST_CHARGED
+  PENALTY_FEE
+}
+
+enum CreditStatus {
+  ACTIVE
+  PAID
+  OVERDUE
+  DEFAULTED
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  SYSTEM
+  QUICK_MESSAGE
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  MODERATOR
+} 
