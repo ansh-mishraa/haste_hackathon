@@ -383,6 +383,128 @@ router.get('/:id/dashboard', async (req, res) => {
   }
 });
 
+// Helper function to handle group bids
+async function handleGroupBid(req, res) {
+  try {
+    const {
+      orderId,
+      supplierId,
+      totalAmount,
+      message,
+      deliveryTime,
+      validityHours = 24
+    } = req.body;
+
+    // Extract groupId from orderId (format: "group_{groupId}")
+    const groupId = orderId.replace('group_', '');
+
+    // Check if group exists and is confirmed
+    const group = await prisma.buyingGroup.findUnique({
+      where: { id: groupId },
+      include: {
+        orders: {
+          include: {
+            vendor: {
+              select: {
+                id: true,
+                name: true,
+                businessType: true
+              }
+            },
+            items: {
+              include: {
+                product: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!group) {
+      return res.status(404).json({ error: 'Group not found' });
+    }
+
+    if (group.status !== 'CONFIRMED') {
+      return res.status(400).json({ error: 'Group is not accepting bids' });
+    }
+
+    // Check if supplier already has a group bid
+    const existingGroupBid = await prisma.bid.findFirst({
+      where: {
+        supplierId,
+        order: {
+          groupId: groupId
+        }
+      }
+    });
+
+    if (existingGroupBid) {
+      return res.status(400).json({ error: 'Bid already exists for this group' });
+    }
+
+    // Create validity deadline
+    const validUntil = new Date();
+    validUntil.setHours(validUntil.getHours() + validityHours);
+
+    // Create a bid for the first order in the group (representative bid)
+    const firstOrder = group.orders[0];
+    if (!firstOrder) {
+      return res.status(400).json({ error: 'No orders found in group' });
+    }
+
+    const bid = await prisma.bid.create({
+      data: {
+        orderId: firstOrder.id,
+        supplierId,
+        totalAmount,
+        message: message || `Group bid for ${group.name || 'group'} with ${group.orders.length} members`,
+        deliveryTime: new Date(deliveryTime),
+        validUntil
+      },
+      include: {
+        supplier: {
+          select: {
+            id: true,
+            businessName: true,
+            contactPerson: true,
+            rating: true
+          }
+        },
+        order: {
+          include: {
+            vendor: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
+            group: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Notify all group members about the new bid
+    socketService.notifyGroup(groupId, 'new_group_bid_received', {
+      bid,
+      groupId,
+      supplierName: bid.supplier.businessName,
+      memberCount: group.orders.length
+    });
+
+    res.status(201).json(bid);
+  } catch (error) {
+    console.error('Group bid creation error:', error);
+    res.status(500).json({ error: 'Failed to create group bid' });
+  }
+}
+
 // Create bid for an order
 router.post('/bids', async (req, res) => {
   try {
@@ -394,6 +516,11 @@ router.post('/bids', async (req, res) => {
       deliveryTime,
       validityHours = 24
     } = req.body;
+
+    // Check if this is a group bid (orderId starts with "group_")
+    if (orderId.startsWith('group_')) {
+      return await handleGroupBid(req, res);
+    }
 
     // Check if order exists and is biddable
     const order = await prisma.order.findUnique({
@@ -712,7 +839,84 @@ router.get('/:id/available-orders', async (req, res) => {
       );
     }
 
-    res.json(filteredOrders);
+    // Separate group orders from individual orders
+    const groupOrders = {};
+    const individualOrders = [];
+
+    filteredOrders.forEach(order => {
+      if (order.group && order.group.status === 'CONFIRMED') {
+        const groupId = order.group.id;
+        if (!groupOrders[groupId]) {
+          groupOrders[groupId] = {
+            id: `group_${groupId}`,
+            type: 'GROUP',
+            groupId: groupId,
+            group: order.group,
+            totalAmount: 0,
+            consolidatedItems: {},
+            memberCount: 0,
+            orders: [],
+            paymentMethods: new Set(),
+            earliestCreatedAt: order.createdAt
+          };
+        }
+        
+        // Add this order to the group
+        groupOrders[groupId].orders.push(order);
+        groupOrders[groupId].totalAmount += order.totalAmount;
+        groupOrders[groupId].memberCount++;
+        groupOrders[groupId].paymentMethods.add(order.paymentMethod);
+        
+        // Track earliest created date
+        if (order.createdAt < groupOrders[groupId].earliestCreatedAt) {
+          groupOrders[groupId].earliestCreatedAt = order.createdAt;
+        }
+
+        // Consolidate items by product
+        order.items.forEach(item => {
+          const key = `${item.productId}_${item.unit}`;
+          if (groupOrders[groupId].consolidatedItems[key]) {
+            groupOrders[groupId].consolidatedItems[key].quantity += item.quantity;
+            groupOrders[groupId].consolidatedItems[key].totalPrice += item.totalPrice;
+          } else {
+            groupOrders[groupId].consolidatedItems[key] = {
+              productId: item.productId,
+              product: item.product,
+              quantity: item.quantity,
+              unit: item.unit,
+              totalPrice: item.totalPrice,
+              pricePerUnit: item.pricePerUnit
+            };
+          }
+        });
+      } else {
+        // Individual order
+        individualOrders.push({
+          ...order,
+          type: 'INDIVIDUAL'
+        });
+      }
+    });
+
+    // Convert consolidated items to array for each group
+    Object.values(groupOrders).forEach(group => {
+      group.items = Object.values(group.consolidatedItems);
+      delete group.consolidatedItems;
+      
+      // Convert payment methods set to array
+      group.paymentMethods = Array.from(group.paymentMethods);
+      
+      // Use group's created date as the order date
+      group.createdAt = group.earliestCreatedAt;
+    });
+
+    // Combine group orders and individual orders
+    const consolidatedOrders = [
+      ...Object.values(groupOrders),
+      ...individualOrders
+    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json(consolidatedOrders);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch available orders' });
   }

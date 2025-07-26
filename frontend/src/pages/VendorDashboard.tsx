@@ -942,13 +942,14 @@ const OrderHistoryModal: React.FC<{
                   </div>
                 )}
 
-                <div className="flex space-x-3">
-                  {order.bids && order.bids.length > 0 && (
-                    <button className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 text-sm">
-                      View Bids ({order.bids.length})
-                    </button>
-                  )}
-                </div>
+                {order.bids && order.bids.length > 0 && (
+                  <div className="flex items-center text-sm text-blue-600">
+                    <ChartBarIcon className="h-4 w-4 mr-1" />
+                    <span className="font-medium">
+                      {order.bids.length} bid{order.bids.length > 1 ? 's' : ''} received
+                    </span>
+                  </div>
+                )}
               </div>
             ))}
           </div>

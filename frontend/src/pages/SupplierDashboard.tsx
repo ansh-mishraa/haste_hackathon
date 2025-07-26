@@ -38,7 +38,7 @@ const ManageProductsTab: React.FC<{ supplierId: string }> = ({ supplierId }) => 
   const { data: supplierProducts, isLoading: isLoadingProducts } = useQuery(
     ['supplierProducts', supplierId],
     async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/products/supplier/${supplierId}`);
+      const response = await axios.get(`http://localhost:5000/api/products/supplier/${supplierId}`);
       return response.data;
     },
     { enabled: !!supplierId }
@@ -47,7 +47,7 @@ const ManageProductsTab: React.FC<{ supplierId: string }> = ({ supplierId }) => 
   // Create product mutation
   const createProductMutation = useMutation(
     async (productData: any) => {
-      const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/products/supplier/${supplierId}`, productData);
+      const response = await axios.post(`http://localhost:5000/api/products/supplier/${supplierId}`, productData);
       return response.data;
     },
     {
@@ -323,7 +323,7 @@ const SupplierDashboard: React.FC = () => {
   const { data: dashboardData, isLoading: isDashboardLoading, error } = useQuery(
     ['supplierDashboard', currentSupplierId],
     async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}/dashboard`);
+      const response = await axios.get(`http://localhost:5000/api/suppliers/${currentSupplierId}/dashboard`);
       return response.data;
     },
     {
@@ -343,7 +343,7 @@ const SupplierDashboard: React.FC = () => {
   const { data: supplier } = useQuery(
     ['supplier', currentSupplierId],
     async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}`);
+      const response = await axios.get(`http://localhost:5000/api/suppliers/${currentSupplierId}`);
       return response.data;
     },
     { 
@@ -362,7 +362,7 @@ const SupplierDashboard: React.FC = () => {
   const { data: availableOrders } = useQuery(
     ['availableOrders', currentSupplierId],
     async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}/available-orders`);
+      const response = await axios.get(`http://localhost:5000/api/suppliers/${currentSupplierId}/available-orders`);
       return response.data;
     },
     { enabled: shouldEnableQueries && !!currentSupplierId }
@@ -372,7 +372,7 @@ const SupplierDashboard: React.FC = () => {
   const { data: supplierBids } = useQuery(
     ['supplierBids', currentSupplierId],
     async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}/bids`);
+      const response = await axios.get(`http://localhost:5000/api/suppliers/${currentSupplierId}/bids`);
       return response.data;
     },
     { enabled: shouldEnableQueries && !!currentSupplierId }
@@ -415,7 +415,7 @@ const SupplierDashboard: React.FC = () => {
   // Create bid mutation
   const createBidMutation = useMutation(
     async (bidData: any) => {
-      const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/bids`, bidData);
+      const response = await axios.post(`http://localhost:5000/api/suppliers/bids`, bidData);
       return response.data;
     },
     {
@@ -434,7 +434,7 @@ const SupplierDashboard: React.FC = () => {
   // Update order status mutation
   const updateOrderStatusMutation = useMutation(
     async ({ orderId, status }: { orderId: string; status: string }) => {
-      const response = await axios.put(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/orders/${orderId}/status`, {
+      const response = await axios.put(`http://localhost:5000/api/orders/${orderId}/status`, {
         status,
         supplierId: currentSupplierId
       });
@@ -701,57 +701,108 @@ const SupplierDashboard: React.FC = () => {
                 
                 <div className="space-y-4">
                   {availableOrders?.map((order: any) => (
-                    <div key={order.id} className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+                    <div key={order.id} className={`border rounded-lg p-4 hover:border-blue-300 transition-colors ${
+                      order.type === 'GROUP' ? 'border-blue-200 bg-blue-50' : 'border-gray-200'
+                    }`}>
                       <div className="flex justify-between items-start mb-3">
                         <div>
-                          <h4 className="font-medium text-gray-900">
-                            {order.vendor?.name} - {order.vendor?.businessType}
-                          </h4>
-                          <p className="text-sm text-gray-500">{order.vendor?.businessLocation}</p>
-                          {order.group && (
-                            <p className="text-sm text-blue-600 font-medium">
-                              Group Order • {order.group.pickupLocation}
-                            </p>
+                          {order.type === 'GROUP' ? (
+                            <>
+                              <div className="flex items-center space-x-2 mb-1">
+                                <h4 className="font-medium text-gray-900">
+                                  {order.group?.name || `Group Order #${order.groupId.slice(0, 8)}`}
+                                </h4>
+                                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                                  GROUP
+                                </span>
+                              </div>
+                              <p className="text-sm text-blue-600 font-medium">
+                                📍 {order.group.pickupLocation}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                {order.memberCount} vendors • Pickup: {formatDate(order.group.targetPickupTime)}
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <h4 className="font-medium text-gray-900">
+                                {order.vendor?.name} - {order.vendor?.businessType}
+                              </h4>
+                              <p className="text-sm text-gray-500">{order.vendor?.businessLocation}</p>
+                            </>
                           )}
                         </div>
                         <div className="text-right">
                           <p className="text-lg font-semibold">{formatCurrency(order.totalAmount)}</p>
-                          {order.group && (
-                            <p className="text-sm text-green-600">Group Discount Available</p>
+                          {order.type === 'GROUP' && (
+                            <p className="text-sm text-green-600 font-medium">🎯 Bulk Order Savings</p>
                           )}
                           <div className="mt-2">
-                            <span className={`inline-flex px-2 py-1 text-xs rounded-full font-medium ${
-                              order.paymentMethod === 'UPI' ? 'bg-purple-100 text-purple-800' :
-                              order.paymentMethod === 'PAY_LATER' ? 'bg-orange-100 text-orange-800' :
-                              order.paymentMethod === 'CASH' ? 'bg-green-100 text-green-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {order.paymentMethod === 'PAY_LATER' ? 'Pay Later' : 
-                               order.paymentMethod === 'UPI' ? 'UPI Payment' : 
-                               order.paymentMethod === 'CASH' ? 'Cash Payment' :
-                               order.paymentMethod}
-                            </span>
+                            {order.type === 'GROUP' ? (
+                              <div className="flex flex-wrap gap-1">
+                                {order.paymentMethods.map((method: string, index: number) => (
+                                  <span key={index} className={`inline-flex px-2 py-1 text-xs rounded-full font-medium ${
+                                    method === 'UPI' ? 'bg-purple-100 text-purple-800' :
+                                    method === 'PAY_LATER' ? 'bg-orange-100 text-orange-800' :
+                                    method === 'CASH' ? 'bg-green-100 text-green-800' :
+                                    'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {method === 'PAY_LATER' ? 'Pay Later' : 
+                                     method === 'UPI' ? 'UPI' : 
+                                     method === 'CASH' ? 'Cash' :
+                                     method}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className={`inline-flex px-2 py-1 text-xs rounded-full font-medium ${
+                                order.paymentMethod === 'UPI' ? 'bg-purple-100 text-purple-800' :
+                                order.paymentMethod === 'PAY_LATER' ? 'bg-orange-100 text-orange-800' :
+                                order.paymentMethod === 'CASH' ? 'bg-green-100 text-green-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {order.paymentMethod === 'PAY_LATER' ? 'Pay Later' : 
+                                 order.paymentMethod === 'UPI' ? 'UPI Payment' : 
+                                 order.paymentMethod === 'CASH' ? 'Cash Payment' :
+                                 order.paymentMethod}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
 
                       {/* Order Items */}
                       <div className="mb-3">
-                        <h5 className="text-sm font-medium text-gray-700 mb-2">Items Required:</h5>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                          {order.items?.map((item: any) => (
-                            <div key={item.id} className="text-sm bg-gray-50 p-2 rounded">
-                              <span className="font-medium">{item.product.name}</span>
-                              <span className="text-gray-500 ml-1">
-                                ({item.quantity} {item.unit})
-                              </span>
+                        <h5 className="text-sm font-medium text-gray-700 mb-2">
+                          {order.type === 'GROUP' ? 'Consolidated Items Required:' : 'Items Required:'}
+                        </h5>
+                        <div className={`grid gap-2 ${order.type === 'GROUP' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-2 md:grid-cols-3'}`}>
+                          {order.items?.map((item: any, index: number) => (
+                            <div key={order.type === 'GROUP' ? index : item.id} 
+                                 className={`text-sm p-3 rounded ${order.type === 'GROUP' ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'}`}>
+                              <div className="flex justify-between items-center">
+                                <span className="font-medium">{item.product.name}</span>
+                                <span className="text-gray-500 font-semibold">
+                                  {item.quantity} {item.unit}
+                                </span>
+                              </div>
+                              {order.type === 'GROUP' && (
+                                <div className="text-xs text-blue-600 mt-1">
+                                  Total Value: {formatCurrency(item.totalPrice)}
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
+                        {order.type === 'GROUP' && (
+                          <p className="text-xs text-blue-600 mt-2">
+                            💡 Tip: These are consolidated quantities from {order.memberCount} vendors
+                          </p>
+                        )}
                       </div>
 
-                      {/* Existing Bids */}
-                      {order.bids && order.bids.length > 0 && (
+                      {/* Existing Bids - Only for individual orders */}
+                      {order.type === 'INDIVIDUAL' && order.bids && order.bids.length > 0 && (
                         <div className="mb-3">
                           <p className="text-sm text-gray-600">
                             {order.bids.length} bid(s) received • Lowest: {formatCurrency(order.bids[0]?.totalAmount)}
@@ -762,14 +813,18 @@ const SupplierDashboard: React.FC = () => {
                       <div className="flex justify-between items-center">
                         <div className="text-sm text-gray-500">
                           <ClockIcon className="inline h-4 w-4 mr-1" />
-                          {order.group ? `Pickup: ${formatDate(order.group.targetPickupTime)}` : 'Individual Order'}
+                          {order.type === 'GROUP' ? `Pickup: ${formatDate(order.group.targetPickupTime)}` : 'Individual Order'}
                         </div>
                         <button
                           onClick={() => setBidModal({ isOpen: true, order })}
-                          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                          className={`text-white px-4 py-2 rounded-md transition-colors ${
+                            order.type === 'GROUP' 
+                              ? 'bg-green-600 hover:bg-green-700' 
+                              : 'bg-blue-600 hover:bg-blue-700'
+                          }`}
                         >
                           <PlusIcon className="inline h-4 w-4 mr-1" />
-                          Place Bid
+                          {order.type === 'GROUP' ? 'Bid for Group' : 'Place Bid'}
                         </button>
                       </div>
                     </div>
