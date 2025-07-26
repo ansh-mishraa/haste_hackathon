@@ -10,6 +10,7 @@ datasource db {
 model Vendor {
   id                     String              @id @default(cuid())
   phone                  String              @unique
+  password               String       @default("changeme123")        // Hashed password
   name                   String
   businessType           String
   businessLocation       String
