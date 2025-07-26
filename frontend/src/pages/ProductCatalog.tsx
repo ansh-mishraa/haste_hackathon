@@ -308,7 +308,7 @@ const ProductCatalog: React.FC = () => {
         )}
 
         {/* Seed Products Button */}
-        <div className="mt-8 text-center">
+        {/* <div className="mt-8 text-center">
           <button
             onClick={async () => {
               try {
@@ -322,7 +322,7 @@ const ProductCatalog: React.FC = () => {
           >
             Load Sample Products
           </button>
-        </div>
+        </div> */}
 
         {/* Floating Cart Button */}
         {cart.length > 0 && (
