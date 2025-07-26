@@ -408,22 +408,33 @@ const ProductCatalog: React.FC = () => {
           </div>
         )}
 
-        {/* Seed Products Button */}
-        {/* <div className="mt-8 text-center">
-          <button
-            onClick={async () => {
-              try {
-                await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/products/seed`);
-                window.location.reload();
-              } catch (error) {
-                console.error('Error seeding products:', error);
-              }
-            }}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-          >
-            Load Sample Products
-          </button>
-        </div> */}
+        {/* Seed Products Button - Show when no products */}
+        {products && products.length === 0 && (
+          <div className="mt-8 text-center">
+            <button
+              onClick={async () => {
+                try {
+                  toast.loading('Creating sample products...');
+                  await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/products/seed`);
+                  toast.dismiss();
+                  toast.success('Sample products loaded successfully!');
+                  queryClient.invalidateQueries('products');
+                } catch (error) {
+                  toast.dismiss();
+                  toast.error('Failed to load sample products');
+                  console.error('Error seeding products:', error);
+                }
+              }}
+              className="inline-flex items-center px-6 py-3 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+            >
+              <PlusIcon className="h-5 w-5 mr-2" />
+              Load Sample Products
+            </button>
+            <p className="mt-2 text-sm text-gray-500">
+              This will add common ingredients like vegetables, oils, and spices to get you started
+            </p>
+          </div>
+        )}
 
         {/* Floating Cart Button */}
         {cart.length > 0 && (

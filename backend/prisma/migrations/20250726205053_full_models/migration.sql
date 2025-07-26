@@ -35,6 +35,7 @@ CREATE TYPE "AdminRole" AS ENUM ('SUPER_ADMIN', 'ADMIN', 'MODERATOR');
 CREATE TABLE "vendors" (
     "id" TEXT NOT NULL,
     "phone" TEXT NOT NULL,
+    "password" TEXT NOT NULL DEFAULT 'changeme123',
     "name" TEXT NOT NULL,
     "businessType" TEXT NOT NULL,
     "businessLocation" TEXT NOT NULL,
@@ -93,6 +94,8 @@ CREATE TABLE "products" (
     "description" TEXT,
     "imageUrl" TEXT,
     "marketPrice" DOUBLE PRECISION,
+    "supplierId" TEXT,
+    "isCustom" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -272,6 +275,9 @@ CREATE UNIQUE INDEX "group_memberships_vendorId_groupId_key" ON "group_membershi
 
 -- CreateIndex
 CREATE UNIQUE INDEX "admin_users_email_key" ON "admin_users"("email");
+
+-- AddForeignKey
+ALTER TABLE "products" ADD CONSTRAINT "products_supplierId_fkey" FOREIGN KEY ("supplierId") REFERENCES "suppliers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "group_memberships" ADD CONSTRAINT "group_memberships_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "buying_groups"("id") ON DELETE CASCADE ON UPDATE CASCADE;

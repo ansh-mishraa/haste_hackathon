@@ -1,5 +1,4 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
 const { prisma } = require('../config/database');
 const router = express.Router();
 
@@ -32,7 +31,6 @@ router.post('/', async (req, res) => {
   try {
     const {
       phone,
-      password,
       name,
       businessType,
       businessLocation,
@@ -44,16 +42,9 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     // Validate required fields
-    if (!phone || !password || !name || !businessType || !businessLocation) {
+    if (!phone || !name || !businessType || !businessLocation) {
       return res.status(400).json({ 
-        error: 'Missing required fields: phone, password, name, businessType, businessLocation' 
-      });
-    }
-
-    // Validate password length
-    if (password.length < 6) {
-      return res.status(400).json({ 
-        error: 'Password must be at least 6 characters long' 
+        error: 'Missing required fields: phone, name, businessType, businessLocation' 
       });
     }
 
@@ -68,13 +59,9 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
-
     const vendor = await prisma.vendor.create({
       data: {
         phone,
-        password: hashedPassword,
         name,
         businessType,
         businessLocation,
@@ -88,14 +75,13 @@ router.post('/', async (req, res) => {
 
     res.status(201).json({
       message: 'Vendor created successfully',
-      vendor: {
-        id: vendor.id,
-        name: vendor.name,
-        businessType: vendor.businessType,
-        businessLocation: vendor.businessLocation,
-        trustScore: vendor.trustScore,
-        availableCredit: vendor.availableCredit
-      }
+      id: vendor.id,
+      name: vendor.name,
+      phone: vendor.phone,
+      businessType: vendor.businessType,
+      businessLocation: vendor.businessLocation,
+      trustScore: vendor.trustScore,
+      isVerified: vendor.isVerified
     });
   } catch (error) {
     console.error('Error creating vendor:', error);

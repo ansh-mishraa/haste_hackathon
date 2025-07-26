@@ -356,10 +356,10 @@ const CreateOrder: React.FC = () => {
                     </div>
 
                     <button
-                      onClick={handleCreateOrder}
+                      onClick={() => setShowPaymentModal(true)}
                       className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition-colors"
                     >
-                      Proceed to Payment
+                      Choose Payment Method & Create Order
                     </button>
                   </div>
                 )}
@@ -490,7 +490,7 @@ const CreateOrder: React.FC = () => {
                 </button>
                 <button
                   onClick={handlePaymentSubmit}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || (paymentMethod === 'PAY_LATER' && !agreedToTerms)}
                   className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
                 >
                   {isSubmitting ? 'Creating Order...' : 'Create Order'}
