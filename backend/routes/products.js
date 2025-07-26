@@ -255,22 +255,22 @@ router.post('/seed', async (req, res) => {
     ];
 
     // Create products if they don't exist
-    const createdProducts = [];
-    for (const productData of commonProducts) {
-      try {
-        const product = await prisma.product.create({
-          data: productData
-        });
-        createdProducts.push(product);
-      } catch (error) {
-        if (error.code === 'P2002') {
-          // Product already exists, skip
-          continue;
-        } else {
-          throw error;
-        }
-      }
-    }
+    // const createdProducts = [];
+    // for (const productData of commonProducts) {
+    //   try {
+    //     const product = await prisma.product.create({
+    //       data: productData
+    //     });
+    //     createdProducts.push(product);
+    //   } catch (error) {
+    //     if (error.code === 'P2002') {
+    //       // Product already exists, skip
+    //       continue;
+    //     } else {
+    //       throw error;
+    //     }
+    //   }
+    // }
 
     res.status(201).json({
       message: `Seeded ${createdProducts.length} products`,
