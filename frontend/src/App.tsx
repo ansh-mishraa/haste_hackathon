@@ -11,6 +11,7 @@ import PaymentPage from './pages/PaymentPage.tsx';
 import ProductCatalog from './pages/ProductCatalog.tsx';
 import { SocketProvider } from './context/SocketContext.tsx';
 import { AuthProvider } from './context/AuthContext.tsx';
+import { CartProvider } from './context/CartContext.tsx';
 import './App.css';
 
 // Create a client
@@ -27,38 +28,40 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <SocketProvider>
-          <Router>
-            <div className="App">
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/vendor/:id/dashboard" element={<VendorDashboard />} />
-                <Route path="/vendor/:id/order/create" element={<CreateOrder />} />
-                <Route path="/supplier/:id/dashboard" element={<SupplierDashboard />} />
-                <Route path="/group/:id" element={<GroupDetails />} />
-                <Route path="/payment/:id" element={<PaymentPage />} />
-                <Route path="/products" element={<ProductCatalog />} />
-              </Routes>
-              <Toaster 
-                position="top-right"
-                toastOptions={{
-                  duration: 4000,
-                  style: {
-                    background: '#363636',
-                    color: '#fff',
-                  },
-                  success: {
-                    duration: 3000,
+        <CartProvider>
+          <SocketProvider>
+            <Router>
+              <div className="App">
+                <Routes>
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/vendor/:id/dashboard" element={<VendorDashboard />} />
+                  <Route path="/vendor/:id/order/create" element={<CreateOrder />} />
+                  <Route path="/supplier/:id/dashboard" element={<SupplierDashboard />} />
+                  <Route path="/group/:id" element={<GroupDetails />} />
+                  <Route path="/payment/:id" element={<PaymentPage />} />
+                  <Route path="/products" element={<ProductCatalog />} />
+                </Routes>
+                <Toaster 
+                  position="top-right"
+                  toastOptions={{
+                    duration: 4000,
                     style: {
-                      background: '#10B981',
+                      background: '#363636',
                       color: '#fff',
                     },
-                  },
-                }}
-              />
-            </div>
-          </Router>
-        </SocketProvider>
+                    success: {
+                      duration: 3000,
+                      style: {
+                        background: '#10B981',
+                        color: '#fff',
+                      },
+                    },
+                  }}
+                />
+              </div>
+            </Router>
+          </SocketProvider>
+        </CartProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

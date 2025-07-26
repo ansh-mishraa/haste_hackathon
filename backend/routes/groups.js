@@ -42,7 +42,10 @@ router.get('/', async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    res.json(groups);
+    // Calculate totals for each group
+    const groupsWithTotals = groups.map(calculateGroupTotals);
+
+    res.json(groupsWithTotals);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch groups' });
   }
@@ -211,7 +214,10 @@ router.get('/:id', async (req, res) => {
     const consolidatedOrder = consolidateGroupOrders(group.orders);
     group.consolidatedOrder = consolidatedOrder;
 
-    res.json(group);
+    // Calculate group totals
+    const groupWithTotals = calculateGroupTotals(group);
+
+    res.json(groupWithTotals);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch group details' });
   }
@@ -544,6 +550,21 @@ router.get('/suggestions/:vendorId', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch group suggestions' });
   }
 });
+
+// Helper function to calculate group totals
+function calculateGroupTotals(group) {
+  const totalValue = group.orders?.reduce((sum, order) => {
+    return sum + (order.totalAmount || 0);
+  }, 0) || 0;
+  
+  const estimatedSavings = totalValue * 0.20; // 20% average savings
+  
+  return {
+    ...group,
+    totalValue,
+    estimatedSavings
+  };
+}
 
 // Helper function to consolidate group orders
 function consolidateGroupOrders(orders) {

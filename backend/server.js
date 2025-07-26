@@ -21,6 +21,7 @@ const orderRoutes = require('./routes/orders');
 const groupRoutes = require('./routes/groups');
 const paymentRoutes = require('./routes/payments');
 const productRoutes = require('./routes/products');
+const bidRoutes = require('./routes/bids');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -106,6 +107,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/bids', bidRoutes);
 
 // Socket.io connection handling
 socketService.initializeSocket(io);

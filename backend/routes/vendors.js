@@ -359,6 +359,159 @@ router.get('/nearby/:latitude/:longitude', async (req, res) => {
   }
 });
 
+// Get bids for vendor's orders
+router.get('/:id/bids', async (req, res) => {
+  try {
+    const vendorId = req.params.id;
+    const { status } = req.query;
+
+    let whereClause = {
+      order: {
+        vendorId: vendorId
+      }
+    };
+
+    if (status) {
+      whereClause.status = status;
+    }
+
+    const bids = await prisma.bid.findMany({
+      where: whereClause,
+      include: {
+        supplier: {
+          select: {
+            id: true,
+            businessName: true,
+            contactPerson: true,
+            rating: true
+          }
+        },
+        order: {
+          select: {
+            id: true,
+            totalAmount: true,
+            status: true,
+            createdAt: true,
+            items: {
+              include: {
+                product: {
+                  select: {
+                    name: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    res.json(bids);
+  } catch (error) {
+    console.error('Error fetching vendor bids:', error);
+    res.status(500).json({ error: 'Failed to fetch bids' });
+  }
+});
+
+// Accept a bid
+router.put('/bids/:bidId/accept', async (req, res) => {
+  try {
+    const { bidId } = req.params;
+
+    // Check if bid exists and get vendor info
+    const bid = await prisma.bid.findUnique({
+      where: { id: bidId },
+      include: {
+        order: {
+          include: {
+            vendor: true
+          }
+        },
+        supplier: true
+      }
+    });
+
+    if (!bid) {
+      return res.status(404).json({ error: 'Bid not found' });
+    }
+
+    if (bid.status !== 'PENDING') {
+      return res.status(400).json({ error: 'Bid is no longer pending' });
+    }
+
+    // Update bid status to accepted
+    const updatedBid = await prisma.bid.update({
+      where: { id: bidId },
+      data: { status: 'ACCEPTED' },
+      include: {
+        supplier: true,
+        order: true
+      }
+    });
+
+    // Update order with supplier and status
+    await prisma.order.update({
+      where: { id: bid.orderId },
+      data: {
+        supplierId: bid.supplierId,
+        status: 'CONFIRMED',
+        totalAmount: bid.totalAmount
+      }
+    });
+
+    // Reject all other bids for this order
+    await prisma.bid.updateMany({
+      where: {
+        orderId: bid.orderId,
+        id: { not: bidId },
+        status: 'PENDING'
+      },
+      data: { status: 'REJECTED' }
+    });
+
+    res.json(updatedBid);
+  } catch (error) {
+    console.error('Error accepting bid:', error);
+    res.status(500).json({ error: 'Failed to accept bid' });
+  }
+});
+
+// Reject a bid
+router.put('/bids/:bidId/reject', async (req, res) => {
+  try {
+    const { bidId } = req.params;
+
+    const bid = await prisma.bid.findUnique({
+      where: { id: bidId }
+    });
+
+    if (!bid) {
+      return res.status(404).json({ error: 'Bid not found' });
+    }
+
+    if (bid.status !== 'PENDING') {
+      return res.status(400).json({ error: 'Bid is no longer pending' });
+    }
+
+    const updatedBid = await prisma.bid.update({
+      where: { id: bidId },
+      data: { status: 'REJECTED' },
+      include: {
+        supplier: true,
+        order: true
+      }
+    });
+
+    res.json(updatedBid);
+  } catch (error) {
+    console.error('Error rejecting bid:', error);
+    res.status(500).json({ error: 'Failed to reject bid' });
+  }
+});
+
 // Helper function to calculate distance between two points
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // Earth's radius in kilometers
