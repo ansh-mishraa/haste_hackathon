@@ -2,14 +2,14 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { Toaster } from 'react-hot-toast';
-import HomePage from './pages/HomePage';
-import VendorDashboard from './pages/VendorDashboard';
-import SupplierDashboard from './pages/SupplierDashboard';
-import CreateOrder from './pages/CreateOrder';
-import GroupDetails from './pages/GroupDetails';
-import PaymentPage from './pages/PaymentPage';
-import ProductCatalog from './pages/ProductCatalog';
-import { SocketProvider } from './context/SocketContext';
+import HomePage from './pages/HomePage.tsx';
+import VendorDashboard from './pages/VendorDashboard.tsx';
+import SupplierDashboard from './pages/SupplierDashboard.tsx';
+import CreateOrder from './pages/CreateOrder.tsx';
+import GroupDetails from './pages/GroupDetails.tsx';
+import PaymentPage from './pages/PaymentPage.tsx';
+import ProductCatalog from './pages/ProductCatalog.tsx';
+import { SocketProvider } from './context/SocketContext.tsx';
 import './App.css';
 
 // Create a client

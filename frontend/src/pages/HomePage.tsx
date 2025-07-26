@@ -8,8 +8,8 @@ import {
   TruckIcon,
   ClockIcon
 } from '@heroicons/react/24/outline';
-import VendorRegistration from '../components/VendorRegistration';
-import SupplierRegistration from '../components/SupplierRegistration';
+import VendorRegistration from '../components/VendorRegistration.tsx';
+import SupplierRegistration from '../components/SupplierRegistration.tsx';
 
 const HomePage: React.FC = () => {
   const [showVendorForm, setShowVendorForm] = useState(false);

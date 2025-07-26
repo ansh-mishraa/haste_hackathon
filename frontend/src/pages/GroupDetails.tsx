@@ -16,7 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { useSocket } from '../context/SocketContext';
+import { useSocket } from '../context/SocketContext.tsx';
 
 const GroupDetails: React.FC = () => {
   const { id: groupId } = useParams<{ id: string }>();
