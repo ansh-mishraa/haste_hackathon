@@ -25,7 +25,7 @@ const useDebounce = (value: string, delay: number) => {
 
 const ProductCatalog: React.FC = () => {
   const navigate = useNavigate();
-  const { user, isAuthenticated, getUserId } = useAuth();
+  const { user, isAuthenticated, isLoading, getUserId } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [cart, setCart] = useState<any[]>([]);
@@ -38,6 +38,11 @@ const ProductCatalog: React.FC = () => {
 
   // Validate authentication
   React.useEffect(() => {
+    // Don't do anything while authentication is loading
+    if (isLoading) {
+      return;
+    }
+
     if (!isAuthenticated || !vendorId) {
       toast.error('Please login to browse products.');
       navigate('/', { replace: true });
@@ -50,13 +55,13 @@ const ProductCatalog: React.FC = () => {
       navigate('/', { replace: true });
       return;
     }
-  }, [isAuthenticated, vendorId, user, navigate]);
+  }, [isLoading, isAuthenticated, vendorId, user, navigate]);
 
   // Check if we should enable queries
-  const shouldEnableQueries = isAuthenticated && vendorId && user?.type === 'vendor';
+  const shouldEnableQueries = !isLoading && isAuthenticated && vendorId && user?.type === 'vendor';
 
   // Fetch products with debounced search
-  const { data: products, isLoading } = useQuery(
+  const { data: products, isLoading: isProductsLoading } = useQuery(
     ['products', debouncedSearchTerm, selectedCategory],
     async () => {
       const params = new URLSearchParams();
@@ -84,12 +89,14 @@ const ProductCatalog: React.FC = () => {
   );
 
   // Show loading if not authenticated
-  if (!isAuthenticated || !vendorId || user?.type !== 'vendor') {
+  if (isLoading || (!isAuthenticated || !vendorId || user?.type !== 'vendor')) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">
+            {isLoading ? 'Loading...' : 'Validating access...'}
+          </p>
         </div>
       </div>
     );
@@ -161,7 +168,7 @@ const ProductCatalog: React.FC = () => {
   // Show loading indicator when search is being typed but not yet debounced
   const isSearching = searchTerm !== debouncedSearchTerm;
 
-  if (isLoading) {
+  if (isProductsLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-7xl mx-auto">

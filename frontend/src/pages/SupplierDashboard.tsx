@@ -22,7 +22,7 @@ const SupplierDashboard: React.FC = () => {
   const { id: supplierId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user, isAuthenticated, getUserId, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, getUserId, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [bidModal, setBidModal] = useState<{ isOpen: boolean; order: any }>({ isOpen: false, order: null });
 
@@ -31,10 +31,10 @@ const SupplierDashboard: React.FC = () => {
   const currentSupplierId = authenticatedSupplierId;
 
   // Check if we should enable queries
-  const shouldEnableQueries = isAuthenticated && authenticatedSupplierId && user?.type === 'supplier';
+  const shouldEnableQueries = !isLoading && isAuthenticated && authenticatedSupplierId && user?.type === 'supplier';
 
   // Fetch supplier dashboard data
-  const { data: dashboardData, isLoading, error } = useQuery(
+  const { data: dashboardData, isLoading: isDashboardLoading, error } = useQuery(
     ['supplierDashboard', currentSupplierId],
     async () => {
       const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}/dashboard`);
@@ -94,6 +94,11 @@ const SupplierDashboard: React.FC = () => {
 
   // Validate authentication and supplier access
   useEffect(() => {
+    // Don't do anything while authentication is loading
+    if (isLoading) {
+      return;
+    }
+
     if (!isAuthenticated || !authenticatedSupplierId) {
       toast.error('Please login to access your dashboard.');
       navigate('/', { replace: true });
@@ -119,7 +124,7 @@ const SupplierDashboard: React.FC = () => {
       navigate(`/supplier/${authenticatedSupplierId}/dashboard`, { replace: true });
       return;
     }
-  }, [isAuthenticated, authenticatedSupplierId, user, supplierId, navigate]);
+  }, [isLoading, isAuthenticated, authenticatedSupplierId, user, supplierId, navigate]);
 
   // Create bid mutation
   const createBidMutation = useMutation(
@@ -161,12 +166,14 @@ const SupplierDashboard: React.FC = () => {
   );
 
   // Show loading spinner while validating
-  if (!isAuthenticated || !authenticatedSupplierId || user?.type !== 'supplier') {
+  if (isLoading || (!isAuthenticated || !authenticatedSupplierId || user?.type !== 'supplier')) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
+          <p className="text-gray-600">
+            {isLoading ? 'Loading...' : 'Validating access...'}
+          </p>
         </div>
       </div>
     );
@@ -223,7 +230,7 @@ const SupplierDashboard: React.FC = () => {
     );
   }
 
-  if (isLoading) {
+  if (isDashboardLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-7xl mx-auto">

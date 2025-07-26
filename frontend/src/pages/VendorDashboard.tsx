@@ -812,7 +812,7 @@ const VendorDashboard: React.FC = () => {
   const { id: vendorId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user, isAuthenticated, getUserId, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, getUserId, logout } = useAuth();
   const [showGroupFinder, setShowGroupFinder] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
@@ -824,10 +824,10 @@ const VendorDashboard: React.FC = () => {
   const currentVendorId = authenticatedVendorId;
 
   // Check if we should enable queries
-  const shouldEnableQueries = isAuthenticated && authenticatedVendorId && user?.type === 'vendor';
+  const shouldEnableQueries = !isLoading && isAuthenticated && !!authenticatedVendorId && user?.type === 'vendor';
 
   // Fetch vendor dashboard data
-  const { data: dashboardData, isLoading } = useQuery(
+  const { data: dashboardData, isLoading: isDashboardLoading } = useQuery(
     ['vendorDashboard', currentVendorId],
     async () => {
       const response = await axios.get(`${API_URL}/api/vendors/${currentVendorId}/dashboard`);
@@ -893,6 +893,11 @@ const VendorDashboard: React.FC = () => {
 
   // Validate authentication and vendor access
   useEffect(() => {
+    // Don't do anything while authentication is loading
+    if (isLoading) {
+      return;
+    }
+
     if (!isAuthenticated || !authenticatedVendorId) {
       toast.error('Please login to access your dashboard.');
       navigate('/', { replace: true });
@@ -915,15 +920,17 @@ const VendorDashboard: React.FC = () => {
       navigate(`/vendor/${authenticatedVendorId}/dashboard`, { replace: true });
       return;
     }
-  }, [isAuthenticated, authenticatedVendorId, user, vendorId, navigate]);
+  }, [isLoading, isAuthenticated, authenticatedVendorId, user, vendorId, navigate]);
 
   // Show loading spinner while validating
-  if (!isAuthenticated || !authenticatedVendorId || user?.type !== 'vendor') {
+  if (isLoading || (!isAuthenticated || !authenticatedVendorId || user?.type !== 'vendor')) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
+          <p className="text-gray-600">
+            {isLoading ? 'Loading...' : 'Validating access...'}
+          </p>
         </div>
       </div>
     );
@@ -937,7 +944,7 @@ const VendorDashboard: React.FC = () => {
     }).format(amount);
   };
 
-  if (isLoading) {
+  if (isDashboardLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-7xl mx-auto">
