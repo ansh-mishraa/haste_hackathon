@@ -102,7 +102,7 @@ router.post('/', async (req, res) => {
         orderType,
         totalAmount,
         paymentMethod,
-        paymentStatus: paymentMethod === 'PAY_NOW' ? 'PENDING' : 'PENDING',
+        paymentStatus: 'PENDING', // Just for display, no actual processing
         isGroupOrder: orderType === 'GROUP',
         pickupTime: pickupTime ? new Date(pickupTime) : null,
         notes,
@@ -133,57 +133,8 @@ router.post('/', async (req, res) => {
       }
     });
 
-    // Create payment record for all orders
-    let paymentStatus = 'PENDING';
-    let paymentType = 'ORDER_PAYMENT';
-
-    if (paymentMethod === 'PAY_LATER') {
-      paymentStatus = 'PENDING';
-      paymentType = 'CREDIT_PURCHASE';
-    } else if (paymentMethod === 'PAY_NOW' || paymentMethod === 'UPI') {
-      paymentStatus = 'PENDING';
-      paymentType = 'ORDER_PAYMENT';
-    } else if (paymentMethod === 'CASH') {
-      paymentStatus = 'PENDING';
-      paymentType = 'ORDER_PAYMENT';
-    }
-
-    // Create payment record
-    await prisma.payment.create({
-      data: {
-        vendorId,
-        orderId: order.id,
-        amount: totalAmount,
-        type: paymentType,
-        method: paymentMethod,
-        status: paymentStatus,
-        description: `Payment for Order #${order.id.substring(0, 8)}`
-      }
-    });
-
-    // If it's a pay-later order, also create credit transaction
-    if (paymentMethod === 'PAY_LATER') {
-      await prisma.creditTransaction.create({
-        data: {
-          vendorId,
-          amount: totalAmount,
-          type: 'CREDIT_USED',
-          description: `Order #${order.id.substring(0, 8)}`,
-          orderId: order.id,
-          dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000) // Due tomorrow
-        }
-      });
-
-      // Update vendor's used credit
-      await prisma.vendor.update({
-        where: { id: vendorId },
-        data: {
-          usedCredit: {
-            increment: totalAmount
-          }
-        }
-      });
-    }
+    // Payment method is just stored in the order for supplier information
+    // No actual payment processing needed
 
     // If it's a group order, notify group members
     if (groupId) {
@@ -338,35 +289,8 @@ router.put('/:id/status', async (req, res) => {
           }
         });
 
-        // Mark payment as completed for cash payments
-        if (order.paymentMethod === 'CASH') {
-          await prisma.payment.updateMany({
-            where: { 
-              orderId: orderId,
-              status: 'PENDING'
-            },
-            data: {
-              status: 'COMPLETED',
-              paidAt: new Date(),
-              description: `Payment completed for delivered Order #${orderId.substring(0, 8)}`
-            }
-          });
-        }
-
-        // For pay-later orders, mark the credit transaction as due
-        if (order.paymentMethod === 'PAY_LATER') {
-          await prisma.creditTransaction.updateMany({
-            where: { 
-              orderId: orderId,
-              type: 'CREDIT_USED',
-              status: 'PENDING'
-            },
-            data: {
-              status: 'DUE',
-              description: `Order #${orderId.substring(0, 8)} delivered - Payment due`
-            }
-          });
-        }
+        // No payment processing needed - just update order status
+        // Payment method is for supplier information only
       }
     }
 
@@ -437,28 +361,7 @@ router.post('/:id/items', async (req, res) => {
       }
     });
 
-    // Update credit if pay-later
-    if (order.paymentMethod === 'PAY_LATER') {
-      await prisma.creditTransaction.create({
-        data: {
-          vendorId: order.vendorId,
-          amount: additionalAmount,
-          type: 'CREDIT_USED',
-          description: `Additional items for Order #${orderId.substring(0, 8)}`,
-          orderId,
-          dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000)
-        }
-      });
-
-      await prisma.vendor.update({
-        where: { id: order.vendorId },
-        data: {
-          usedCredit: {
-            increment: additionalAmount
-          }
-        }
-      });
-    }
+    // No credit processing needed - payment method is just for information
 
     res.status(201).json({
       items: newItems,

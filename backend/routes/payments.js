@@ -240,8 +240,7 @@ router.post('/complete/:orderId', async (req, res) => {
       data: {
         status: 'COMPLETED',
         paidAt: new Date(),
-        razorpayPaymentId: upiTransactionId || `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        description: `Payment completed via ${paymentMethod} for Order #${orderId.substring(0, 8)}`
+        razorpayPaymentId: upiTransactionId || `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       }
     });
 
@@ -640,16 +639,14 @@ router.post('/test/create-sample/:vendorId', async (req, res) => {
         method: 'UPI',
         status: 'COMPLETED',
         paidAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
-        description: 'Payment for vegetables order - UPI',
         razorpayPaymentId: `pay_test_${Date.now()}_1`
       },
       {
         vendorId: vendorId,
         amount: 450.00,
-        type: 'CREDIT_PURCHASE',
+        type: 'ORDER_PAYMENT',
         method: 'PAY_LATER',
-        status: 'PENDING',
-        description: 'Credit purchase - Spices and oil order'
+        status: 'PENDING'
       },
       {
         vendorId: vendorId,
@@ -657,16 +654,14 @@ router.post('/test/create-sample/:vendorId', async (req, res) => {
         type: 'ORDER_PAYMENT',
         method: 'CASH',
         status: 'COMPLETED',
-        paidAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-        description: 'Cash payment for bread and dairy'
+        paidAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) // 2 days ago
       },
       {
         vendorId: vendorId,
         amount: 320.00,
         type: 'ORDER_PAYMENT',
         method: 'UPI',
-        status: 'PENDING',
-        description: 'Pending payment for meat order'
+        status: 'PENDING'
       }
     ];
 
@@ -683,7 +678,7 @@ router.post('/test/create-sample/:vendorId', async (req, res) => {
         amount: 450.00,
         type: 'CREDIT_USED',
         description: 'Sample credit transaction',
-        status: 'DUE',
+        status: 'ACTIVE',
         dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Due in 7 days
       }
     });

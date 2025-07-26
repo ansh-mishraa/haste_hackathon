@@ -56,8 +56,7 @@ router.put('/:bidId/accept', async (req, res) => {
       },
       data: {
         amount: bid.totalAmount,
-        status: updatedOrder.paymentMethod === 'CASH' ? 'PENDING' : 'PENDING',
-        description: `Payment for Order #${bid.orderId.substring(0, 8)} - Bid accepted from ${bid.supplier.businessName}`
+        status: updatedOrder.paymentMethod === 'CASH' ? 'PENDING' : 'PENDING'
       }
     });
 
@@ -72,10 +71,9 @@ router.put('/:bidId/accept', async (req, res) => {
           vendorId: bid.order.vendorId,
           orderId: bid.orderId,
           amount: bid.totalAmount,
-          type: updatedOrder.paymentMethod === 'PAY_LATER' ? 'CREDIT_PURCHASE' : 'ORDER_PAYMENT',
+          type: 'ORDER_PAYMENT',
           method: updatedOrder.paymentMethod,
-          status: 'PENDING',
-          description: `Payment for Order #${bid.orderId.substring(0, 8)} - Bid accepted`
+          status: 'PENDING'
         }
       });
     }

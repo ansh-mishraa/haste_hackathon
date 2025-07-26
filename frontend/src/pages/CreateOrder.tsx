@@ -253,63 +253,46 @@ const CreateOrder: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Products List */}
           <div className="lg:col-span-2">
-            {orderItems.length === 0 && products ? (
-              <div className="bg-white rounded-lg shadow">
-                <div className="p-6">
-                  <h2 className="text-lg font-medium text-gray-900 mb-4">
-                    Popular Products
-                  </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {products?.map((product: any) => (
-                      <div
-                        key={product.id}
-                        className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <h3 className="font-medium text-gray-900">{product.name}</h3>
-                            <p className="text-sm text-gray-500">{product.category}</p>
-                            <p className="text-lg font-semibold text-blue-600">
-                              {formatCurrency(product.marketPrice)}
-                              <span className="text-sm font-normal text-gray-500"> /{product.unit}</span>
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => addProduct(product)}
-                            className="ml-4 bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700"
-                          >
-                            <PlusIcon className="h-5 w-5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-6 text-center">
-                    <button
-                      onClick={() => navigate('/products')}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                    >
-                      Browse All Products
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white rounded-lg shadow">
+              <div className="p-6">
                 <h2 className="text-lg font-medium text-gray-900 mb-4">
-                  Items from Product Catalog
+                  Popular Products
                 </h2>
-                <div className="text-center">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {products?.map((product: any) => (
+                    <div
+                      key={product.id}
+                      className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-gray-900">{product.name}</h3>
+                          <p className="text-sm text-gray-500">{product.category}</p>
+                          <p className="text-lg font-semibold text-blue-600">
+                            {formatCurrency(product.marketPrice)}
+                            <span className="text-sm font-normal text-gray-500"> /{product.unit}</span>
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => addProduct(product)}
+                          className="ml-4 bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700"
+                        >
+                          <PlusIcon className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-6 text-center">
                   <button
                     onClick={() => navigate('/products')}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
                   >
-                    <PlusIcon className="h-4 w-4 mr-2" />
-                    Add More Products
+                    Browse All Products
                   </button>
                 </div>
               </div>
-            )}
+            </div>
           </div>
 
           {/* Order Summary */}

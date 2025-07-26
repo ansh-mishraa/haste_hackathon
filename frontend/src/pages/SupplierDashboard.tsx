@@ -719,6 +719,19 @@ const SupplierDashboard: React.FC = () => {
                           {order.group && (
                             <p className="text-sm text-green-600">Group Discount Available</p>
                           )}
+                          <div className="mt-2">
+                            <span className={`inline-flex px-2 py-1 text-xs rounded-full font-medium ${
+                              order.paymentMethod === 'UPI' ? 'bg-purple-100 text-purple-800' :
+                              order.paymentMethod === 'PAY_LATER' ? 'bg-orange-100 text-orange-800' :
+                              order.paymentMethod === 'CASH' ? 'bg-green-100 text-green-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {order.paymentMethod === 'PAY_LATER' ? 'Pay Later' : 
+                               order.paymentMethod === 'UPI' ? 'UPI Payment' : 
+                               order.paymentMethod === 'CASH' ? 'Cash Payment' :
+                               order.paymentMethod}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
@@ -864,6 +877,19 @@ const SupplierDashboard: React.FC = () => {
                           }`}>
                             {order.status.replace('_', ' ')}
                           </span>
+                          <div className="mt-2">
+                            <span className={`inline-flex px-2 py-1 text-xs rounded-full font-medium ${
+                              order.paymentMethod === 'UPI' ? 'bg-purple-100 text-purple-800' :
+                              order.paymentMethod === 'PAY_LATER' ? 'bg-orange-100 text-orange-800' :
+                              order.paymentMethod === 'CASH' ? 'bg-green-100 text-green-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {order.paymentMethod === 'PAY_LATER' ? 'Pay Later' : 
+                               order.paymentMethod === 'UPI' ? 'UPI Payment' : 
+                               order.paymentMethod === 'CASH' ? 'Cash Payment' :
+                               order.paymentMethod}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
