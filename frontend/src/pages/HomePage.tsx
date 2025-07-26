@@ -289,18 +289,14 @@ const HomePage: React.FC = () => {
         </div>
         
         {/* Hero Image */}
-        <div className="lg:absolute lg:inset-y-0 lg:right-0 lg:w-1/2">
-          <div className="h-56 w-full bg-gradient-to-r from-orange-400 to-red-500 sm:h-72 md:h-96 lg:w-full lg:h-full flex items-center justify-center">
-            <div className="text-center text-white">
-              <UsersIcon className="w-24 h-24 mx-auto mb-4" />
-              <p className="text-xl font-semibold">Bringing Vendors Together</p>
-            </div>
-          </div>
-        </div>
+        <div className="lg:absolute lg:inset-y-0 lg:right-0 lg:w-1/2 flex items-center">
+  <img src="https://happay.com/blog/wp-content/uploads/sites/12/2023/04/vendor-management-system.webp" alt="img" />
+</div>
+
       </div>
 
       {/* Stats Section */}
-      <div className="bg-white">
+      {/* <div className="bg-white">
         <div className="max-w-7xl mx-auto py-12 px-4 sm:py-16 sm:px-6 lg:px-8 lg:py-20">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-3xl font-extrabold text-gray-900 sm:text-4xl">
@@ -323,7 +319,7 @@ const HomePage: React.FC = () => {
             ))}
           </dl>
         </div>
-      </div>
+      </div> */}
 
       {/* Features Section */}
       <div className="py-12 bg-gray-50">
