@@ -1,4 +1,5 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
 const { prisma } = require('../config/database');
 const router = express.Router();
 
@@ -31,6 +32,7 @@ router.post('/', async (req, res) => {
   try {
     const {
       phone,
+      password,
       name,
       businessType,
       businessLocation,
@@ -42,9 +44,16 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     // Validate required fields
-    if (!phone || !name || !businessType || !businessLocation) {
+    if (!phone || !password || !name || !businessType || !businessLocation) {
       return res.status(400).json({ 
-        error: 'Missing required fields: phone, name, businessType, businessLocation' 
+        error: 'Missing required fields: phone, password, name, businessType, businessLocation' 
+      });
+    }
+
+    // Validate password length
+    if (password.length < 6) {
+      return res.status(400).json({ 
+        error: 'Password must be at least 6 characters long' 
       });
     }
 
@@ -59,9 +68,13 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 12);
+
     const vendor = await prisma.vendor.create({
       data: {
         phone,
+        password: hashedPassword,
         name,
         businessType,
         businessLocation,

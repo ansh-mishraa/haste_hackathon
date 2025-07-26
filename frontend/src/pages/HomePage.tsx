@@ -21,6 +21,7 @@ const HomePage: React.FC = () => {
   const [showLogin, setShowLogin] = useState(false);
   const [loginType, setLoginType] = useState<'vendor' | 'supplier'>('vendor');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -66,31 +67,35 @@ const HomePage: React.FC = () => {
       return;
     }
 
+    if (!password.trim()) {
+      toast.error('Please enter your password');
+      return;
+    }
+
     setIsLoggingIn(true);
     try {
-      const vendorResponse = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/vendors/by-phone/${phoneNumber}`);
-      if (vendorResponse.data) {
-        const vendorData = {
-          id: vendorResponse.data.id,
-          type: 'vendor' as const,
-          name: vendorResponse.data.name,
-          phone: vendorResponse.data.phone,
-          businessType: vendorResponse.data.businessType,
-          businessLocation: vendorResponse.data.businessLocation,
-          trustScore: vendorResponse.data.trustScore,
-          isVerified: vendorResponse.data.isVerified
-        };
+      const loginResponse = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/auth/vendor/login`, {
+        phone: phoneNumber,
+        password: password
+      });
+
+      if (loginResponse.data.user) {
+        const { user, token } = loginResponse.data;
+        
+        // Store JWT token
+        localStorage.setItem('vendorcircle_token', token);
         
         // Store user data in context and localStorage
-        login(vendorData);
+        login(user);
         
-        toast.success(`Welcome back, ${vendorData.name}! Redirecting to your dashboard...`);
-        navigate(`/vendor/${vendorData.id}/dashboard`);
-        return;
+        toast.success(`Welcome back, ${user.name}! Redirecting to your dashboard...`);
+        navigate(`/vendor/${user.id}/dashboard`);
       }
     } catch (error: any) {
-      if (error.response?.status === 404) {
-        toast.error('No vendor account found with this mobile number. Please register as a vendor first.');
+      if (error.response?.status === 401) {
+        toast.error('Invalid phone number or password. Please check your credentials.');
+      } else if (error.response?.status === 400) {
+        toast.error(error.response.data.error || 'Please provide valid credentials.');
       } else {
         toast.error('Failed to login. Please try again.');
       }
@@ -110,30 +115,35 @@ const HomePage: React.FC = () => {
       return;
     }
 
+    if (!password.trim()) {
+      toast.error('Please enter your password');
+      return;
+    }
+
     setIsLoggingIn(true);
     try {
-      const supplierResponse = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/by-phone/${phoneNumber}`);
-      if (supplierResponse.data) {
-        const supplierData = {
-          id: supplierResponse.data.id,
-          type: 'supplier' as const,
-          name: supplierResponse.data.contactPerson,
-          phone: supplierResponse.data.phone,
-          businessName: supplierResponse.data.businessName,
-          contactPerson: supplierResponse.data.contactPerson,
-          isVerified: supplierResponse.data.isVerified
-        };
+      const loginResponse = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/auth/supplier/login`, {
+        phone: phoneNumber,
+        password: password
+      });
+
+      if (loginResponse.data.user) {
+        const { user, token } = loginResponse.data;
+        
+        // Store JWT token
+        localStorage.setItem('vendorcircle_token', token);
         
         // Store user data in context and localStorage
-        login(supplierData);
+        login(user);
         
-        toast.success(`Welcome back, ${supplierData.name}! Redirecting to your dashboard...`);
-        navigate(`/supplier/${supplierData.id}/dashboard`);
-        return;
+        toast.success(`Welcome back, ${user.contactPerson || user.businessName}! Redirecting to your dashboard...`);
+        navigate(`/supplier/${user.id}/dashboard`);
       }
     } catch (error: any) {
-      if (error.response?.status === 404) {
-        toast.error('No supplier account found with this mobile number. Please register as a supplier first.');
+      if (error.response?.status === 401) {
+        toast.error('Invalid phone number or password. Please check your credentials.');
+      } else if (error.response?.status === 400) {
+        toast.error(error.response.data.error || 'Please provide valid credentials.');
       } else {
         toast.error('Failed to login. Please try again.');
       }
@@ -216,6 +226,18 @@ const HomePage: React.FC = () => {
                             maxLength={10}
                           />
                         </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Password
+                          </label>
+                          <input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Enter your password"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          />
+                        </div>
                         <div className="flex space-x-2">
                           <button
                             onClick={handleLoginSubmit}
@@ -239,6 +261,7 @@ const HomePage: React.FC = () => {
                             onClick={() => {
                               setShowLogin(false);
                               setPhoneNumber('');
+                              setPassword('');
                             }}
                             className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
                           >
@@ -250,6 +273,7 @@ const HomePage: React.FC = () => {
                             onClick={() => {
                               setLoginType(loginType === 'vendor' ? 'supplier' : 'vendor');
                               setPhoneNumber('');
+                              setPassword('');
                             }}
                             className="text-sm text-gray-500 hover:text-gray-700"
                           >

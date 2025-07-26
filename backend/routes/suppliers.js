@@ -1,4 +1,5 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
 const { prisma } = require('../config/database');
 const socketService = require('../services/socketService');
 const router = express.Router();
@@ -56,6 +57,7 @@ router.post('/', async (req, res) => {
   try {
     const {
       phone,
+      password,
       businessName,
       businessRegNumber,
       gstNumber,
@@ -69,13 +71,31 @@ router.post('/', async (req, res) => {
       longitude
     } = req.body;
 
+    // Validate required fields
+    if (!phone || !password || !businessName || !contactPerson || !bankAccount || !businessAddress) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: phone, password, businessName, contactPerson, bankAccount, businessAddress' 
+      });
+    }
+
+    // Validate password length
+    if (password.length < 6) {
+      return res.status(400).json({ 
+        error: 'Password must be at least 6 characters long' 
+      });
+    }
+
     // Convert latitude/longitude to proper types
     const processedLatitude = latitude && latitude !== '' ? parseFloat(latitude) : null;
     const processedLongitude = longitude && longitude !== '' ? parseFloat(longitude) : null;
 
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 12);
+
     const supplier = await prisma.supplier.create({
       data: {
         phone,
+        password: hashedPassword,
         businessName,
         businessRegNumber: businessRegNumber || null,
         gstNumber: gstNumber || null,

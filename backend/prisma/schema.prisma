@@ -10,6 +10,7 @@ datasource db {
 model Vendor {
   id                     String              @id @default(cuid())
   phone                  String              @unique
+  password               String?             // Hashed password (temporarily optional for migration)
   name                   String
   businessType           String
   businessLocation       String
@@ -43,6 +44,7 @@ model Vendor {
 model Supplier {
   id                String   @id @default(cuid())
   phone             String   @unique
+  password          String?  // Hashed password (temporarily optional for migration)
   businessName      String
   businessRegNumber String?
   gstNumber         String?
@@ -63,6 +65,7 @@ model Supplier {
   updatedAt         DateTime @updatedAt
   bids              Bid[]
   orders            Order[]
+  products          Product[] // Products added by this supplier
   ratings           Rating[] @relation("SupplierRatings")
 
   @@map("suppliers")
@@ -72,12 +75,17 @@ model Product {
   id          String      @id @default(cuid())
   name        String
   category    String
-  unit        String
+  unit        String      // kg, pieces, liters, etc.
   description String?
   imageUrl    String?
   marketPrice Float?
+  supplierId  String?     // Optional - tracks which supplier added this product
+  isCustom    Boolean     @default(false) // Tracks if product was added as custom by vendor
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+
+  // Relations
+  supplier    Supplier? @relation(fields: [supplierId], references: [id])
   orderItems  OrderItem[]
 
   @@map("products")
