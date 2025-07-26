@@ -1,22 +1,15 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import toast from 'react-hot-toast';
 
 interface SocketContextType {
   socket: Socket | null;
   isConnected: boolean;
-  joinGroup: (groupId: string) => void;
-  leaveGroup: (groupId: string) => void;
-  sendGroupMessage: (groupId: string, vendorId: string, message: string, vendorName: string) => void;
-  sendQuickMessage: (groupId: string, vendorId: string, messageType: string, vendorName: string) => void;
 }
 
 const SocketContext = createContext<SocketContextType>({
   socket: null,
-  isConnected: false,
-  joinGroup: () => {},
-  leaveGroup: () => {},
-  sendGroupMessage: () => {},
-  sendQuickMessage: () => {},
+  isConnected: false
 });
 
 export const useSocket = () => {
@@ -24,26 +17,19 @@ export const useSocket = () => {
   if (!context) {
     throw new Error('useSocket must be used within a SocketProvider');
   }
-  return context;
+  return context.socket;
 };
 
-interface SocketProviderProps {
-  children: React.ReactNode;
-}
-
-export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
+export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    // Initialize socket connection
     const socketInstance = io(process.env.REACT_APP_API_URL || 'http://localhost:5000', {
       transports: ['websocket', 'polling'],
+      timeout: 5000,
     });
 
-    setSocket(socketInstance);
-
-    // Connection event handlers
     socketInstance.on('connect', () => {
       console.log('Connected to server');
       setIsConnected(true);
@@ -60,68 +46,35 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     });
 
     // Global event listeners for notifications
+    socketInstance.on('notification', (data) => {
+      toast.success(data.message || 'New notification');
+    });
+
     socketInstance.on('new_group_formed', (data) => {
-      console.log('New group formed:', data);
-      // Handle new group notification
+      toast.info(`New group formed near ${data.pickupLocation}`);
     });
 
     socketInstance.on('group_ready_for_bids', (data) => {
-      console.log('Group ready for bids:', data);
-      // Handle group bidding notification
+      toast.info(`Group order ready for bids - Total: ₹${data.totalValue}`);
     });
+
+    socketInstance.on('bid_accepted', (data) => {
+      toast.success(`Your bid was accepted by ${data.supplierName}!`);
+    });
+
+    socketInstance.on('new_bid_received', (data) => {
+      toast.info(`New bid received from ${data.supplierName}`);
+    });
+
+    setSocket(socketInstance);
 
     return () => {
       socketInstance.disconnect();
     };
   }, []);
 
-  const joinGroup = (groupId: string) => {
-    if (socket) {
-      socket.emit('join_group', groupId);
-      console.log(`Joined group: ${groupId}`);
-    }
-  };
-
-  const leaveGroup = (groupId: string) => {
-    if (socket) {
-      socket.emit('leave_group', groupId);
-      console.log(`Left group: ${groupId}`);
-    }
-  };
-
-  const sendGroupMessage = (groupId: string, vendorId: string, message: string, vendorName: string) => {
-    if (socket) {
-      socket.emit('group_message', {
-        groupId,
-        vendorId,
-        message,
-        vendorName
-      });
-    }
-  };
-
-  const sendQuickMessage = (groupId: string, vendorId: string, messageType: string, vendorName: string) => {
-    if (socket) {
-      socket.emit('quick_message', {
-        groupId,
-        vendorId,
-        messageType,
-        vendorName
-      });
-    }
-  };
-
-  const value: SocketContextType = {
-    socket,
-    isConnected,
-    joinGroup,
-    leaveGroup,
-    sendGroupMessage,
-    sendQuickMessage,
-  };
-
   return (
-    <SocketContext.Provider value={value}>
+    <SocketContext.Provider value={{ socket, isConnected }}>
       {children}
     </SocketContext.Provider>
   );

@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
 import { useQuery } from 'react-query';
-import { MagnifyingGlassIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import { useNavigate } from 'react-router-dom';
+import { MagnifyingGlassIcon, FunnelIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 
 const ProductCatalog: React.FC = () => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [cart, setCart] = useState<any[]>([]);
+  
+  // Mock vendor ID (in real app, this would come from auth context)
+  const vendorId = new URLSearchParams(window.location.search).get('vendorId') || 'mock-vendor-id';
 
   // Fetch products
   const { data: products, isLoading } = useQuery(
@@ -35,6 +42,61 @@ const ProductCatalog: React.FC = () => {
       currency: 'INR',
       maximumFractionDigits: 0
     }).format(amount);
+  };
+
+  const handleAddToOrder = (product: any) => {
+    const existingItem = cart.find(item => item.productId === product.id);
+    if (existingItem) {
+      setCart(items => 
+        items.map(item => 
+          item.productId === product.id 
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        )
+      );
+    } else {
+      setCart(items => [...items, {
+        productId: product.id,
+        product,
+        quantity: 1,
+        unit: product.unit,
+        pricePerUnit: product.marketPrice
+      }]);
+    }
+    toast.success(`${product.name} added to cart`);
+  };
+
+  const removeFromCart = (productId: string) => {
+    setCart(items => items.filter(item => item.productId !== productId));
+  };
+
+  const updateQuantity = (productId: string, quantity: number) => {
+    if (quantity <= 0) {
+      removeFromCart(productId);
+      return;
+    }
+    setCart(items =>
+      items.map(item =>
+        item.productId === productId
+          ? { ...item, quantity }
+          : item
+      )
+    );
+  };
+
+  const getTotalAmount = () => {
+    return cart.reduce((total, item) => total + (item.quantity * item.pricePerUnit), 0);
+  };
+
+  const handleCheckout = () => {
+    if (cart.length === 0) {
+      toast.error('Please add some products to your cart');
+      return;
+    }
+    
+    // Navigate to order creation with pre-filled cart
+    const cartData = encodeURIComponent(JSON.stringify(cart));
+    navigate(`/vendor/${vendorId}/order/create?cart=${cartData}`);
   };
 
   if (isLoading) {
@@ -159,7 +221,10 @@ const ProductCatalog: React.FC = () => {
                 )}
 
                 {/* Add to Order Button */}
-                <button className="w-full mt-4 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200">
+                <button 
+                  onClick={() => handleAddToOrder(product)}
+                  className="w-full mt-4 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200"
+                >
                   Add to Order
                 </button>
               </div>
@@ -196,6 +261,69 @@ const ProductCatalog: React.FC = () => {
             Load Sample Products
           </button>
         </div>
+
+        {/* Floating Cart Button */}
+        {cart.length > 0 && (
+          <div className="fixed bottom-6 right-6 z-50">
+            <button
+              onClick={handleCheckout}
+              className="bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-colors duration-200"
+            >
+              <div className="flex items-center">
+                <ShoppingCartIcon className="h-6 w-6" />
+                <span className="ml-2 bg-white text-blue-600 rounded-full px-2 py-1 text-sm font-medium">
+                  {cart.length}
+                </span>
+              </div>
+            </button>
+          </div>
+        )}
+
+        {/* Cart Summary Modal - Show when cart has items */}
+        {cart.length > 0 && (
+          <div className="fixed bottom-24 right-6 z-40 bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm">
+            <h3 className="font-medium text-gray-900 mb-3">Cart Summary</h3>
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {cart.map((item) => (
+                <div key={item.productId} className="flex items-center justify-between text-sm">
+                  <div className="flex-1">
+                    <span className="font-medium">{item.product.name}</span>
+                    <div className="text-gray-500">
+                      {item.quantity} × {formatCurrency(item.pricePerUnit)}
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                      className="text-gray-400 hover:text-gray-600 w-6 h-6 flex items-center justify-center"
+                    >
+                      -
+                    </button>
+                    <span className="w-8 text-center">{item.quantity}</span>
+                    <button
+                      onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                      className="text-gray-400 hover:text-gray-600 w-6 h-6 flex items-center justify-center"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="border-t pt-3 mt-3">
+              <div className="flex justify-between font-semibold">
+                <span>Total:</span>
+                <span>{formatCurrency(getTotalAmount())}</span>
+              </div>
+              <button
+                onClick={handleCheckout}
+                className="w-full mt-2 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 text-sm"
+              >
+                Create Order
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

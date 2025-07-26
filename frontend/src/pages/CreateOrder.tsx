@@ -12,6 +12,23 @@ const CreateOrder: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState('PAY_LATER');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Get cart data and group ID from URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  const cartData = urlParams.get('cart');
+  const groupId = urlParams.get('groupId');
+
+  // Load cart data from URL on component mount
+  React.useEffect(() => {
+    if (cartData) {
+      try {
+        const parsedCart = JSON.parse(decodeURIComponent(cartData));
+        setOrderItems(parsedCart);
+      } catch (error) {
+        console.error('Error parsing cart data:', error);
+      }
+    }
+  }, [cartData]);
+
   // Fetch popular products
   const { data: products } = useQuery(
     'popularProducts',
@@ -74,7 +91,8 @@ const CreateOrder: React.FC = () => {
     try {
       const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/orders`, {
         vendorId,
-        orderType: 'INDIVIDUAL',
+        groupId: groupId || undefined,
+        orderType: groupId ? 'GROUP' : 'INDIVIDUAL',
         paymentMethod,
         items: orderItems.map(item => ({
           productId: item.productId,
@@ -84,8 +102,13 @@ const CreateOrder: React.FC = () => {
         }))
       });
 
-      toast.success('Order created successfully! Looking for groups...');
-      navigate(`/vendor/${vendorId}/dashboard`);
+      if (groupId) {
+        toast.success('Order added to group successfully!');
+        navigate(`/group/${groupId}?vendorId=${vendorId}`);
+      } else {
+        toast.success('Order created successfully! Looking for groups...');
+        navigate(`/vendor/${vendorId}/dashboard`);
+      }
     } catch (error: any) {
       console.error('Order creation error:', error);
       toast.error(error.response?.data?.error || 'Failed to create order');
@@ -107,10 +130,20 @@ const CreateOrder: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Create New Order</h1>
+          <h1 className="text-3xl font-bold text-gray-900">
+            {groupId ? 'Add Order to Group' : 'Create New Order'}
+          </h1>
           <p className="text-gray-600 mt-2">
-            Select ingredients for your business
+            {groupId 
+              ? 'Add your ingredients to the group order for better pricing'
+              : 'Select ingredients for your business'
+            }
           </p>
+          {groupId && (
+            <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+              Group Order
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from 'react-query';
+import { useQuery, useQueryClient } from 'react-query';
 import {
   PlusIcon,
   UserGroupIcon,
@@ -9,7 +9,9 @@ import {
   TruckIcon,
   ChartBarIcon,
   ClockIcon,
-  CurrencyRupeeIcon
+  CurrencyRupeeIcon,
+  XMarkIcon,
+  MapPinIcon
 } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -17,7 +19,10 @@ import toast from 'react-hot-toast';
 const VendorDashboard: React.FC = () => {
   const { id: vendorId } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('overview');
+  const [showGroupFinder, setShowGroupFinder] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   // Fetch vendor dashboard data
   const { data: dashboardData, isLoading } = useQuery(
@@ -208,6 +213,7 @@ const VendorDashboard: React.FC = () => {
               </button>
               
               <button
+                onClick={() => setShowGroupFinder(true)}
                 className="quick-action-btn flex flex-col items-center justify-center p-4 bg-orange-50 rounded-lg hover:bg-orange-100"
               >
                 <UserGroupIcon className="h-8 w-8 text-orange-600 mb-2" />
@@ -215,6 +221,7 @@ const VendorDashboard: React.FC = () => {
               </button>
               
               <button
+                onClick={() => setShowPaymentModal(true)}
                 className="quick-action-btn flex flex-col items-center justify-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100"
               >
                 <CreditCardIcon className="h-8 w-8 text-purple-600 mb-2" />
@@ -320,6 +327,260 @@ const VendorDashboard: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Group Finder Modal */}
+        {showGroupFinder && (
+          <GroupFinderModal 
+            vendorId={vendorId!}
+            onClose={() => setShowGroupFinder(false)}
+            onJoinGroup={(groupId) => {
+              setShowGroupFinder(false);
+              navigate(`/group/${groupId}?vendorId=${vendorId}`);
+            }}
+          />
+        )}
+
+        {/* Payment Modal */}
+        {showPaymentModal && (
+          <PaymentModal 
+            vendorId={vendorId!}
+            onClose={() => setShowPaymentModal(false)}
+            onPaymentComplete={() => {
+              setShowPaymentModal(false);
+              // Refresh vendor data
+              queryClient.invalidateQueries(['vendorDashboard', vendorId]);
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Group Finder Modal Component
+const GroupFinderModal: React.FC<{
+  vendorId: string;
+  onClose: () => void;
+  onJoinGroup: (groupId: string) => void;
+}> = ({ vendorId, onClose, onJoinGroup }) => {
+  const [searchRadius, setSearchRadius] = useState(2);
+  
+  const { data: availableGroups, isLoading } = useQuery(
+    ['groupSuggestions', vendorId, searchRadius],
+    async () => {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/groups/suggestions/${vendorId}?radius=${searchRadius}`);
+      return response.data;
+    }
+  );
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white max-h-[80vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Find Groups to Join</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <XMarkIcon className="h-6 w-6" />
+          </button>
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Search Radius (km)
+          </label>
+          <select
+            value={searchRadius}
+            onChange={(e) => setSearchRadius(parseInt(e.target.value))}
+            className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value={1}>1 km</option>
+            <option value={2}>2 km</option>
+            <option value={5}>5 km</option>
+            <option value={10}>10 km</option>
+          </select>
+        </div>
+
+        {isLoading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="text-gray-500 mt-2">Finding groups...</p>
+          </div>
+        ) : availableGroups && availableGroups.length > 0 ? (
+          <div className="space-y-4">
+            {availableGroups.map((group: any) => (
+              <div key={group.id} className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h4 className="font-medium text-gray-900">
+                      {group.name || `Group ${group.id.slice(0, 8)}`}
+                    </h4>
+                    <p className="text-sm text-gray-600 flex items-center">
+                      <MapPinIcon className="h-4 w-4 mr-1" />
+                      {group.pickupLocation}
+                    </p>
+                    <p className="text-sm text-gray-600 flex items-center">
+                      <ClockIcon className="h-4 w-4 mr-1" />
+                      {formatDate(group.targetPickupTime)}
+                    </p>
+                  </div>
+                  <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                    {group.status}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <div className="text-sm text-gray-600">
+                    {group.memberships?.length || 0} / {group.maxMembers} members
+                  </div>
+                  <button
+                    onClick={() => onJoinGroup(group.id)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm"
+                  >
+                    Join Group
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <UserGroupIcon className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-4 text-lg font-medium text-gray-900">No groups found</h3>
+            <p className="mt-2 text-sm text-gray-500">
+              No groups are currently forming in your area. Try increasing the search radius or create your own group.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Payment Modal Component
+const PaymentModal: React.FC<{
+  vendorId: string;
+  onClose: () => void;
+  onPaymentComplete: () => void;
+}> = ({ vendorId, onClose, onPaymentComplete }) => {
+  const { data: vendor } = useQuery(
+    ['vendor', vendorId],
+    async () => {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/vendors/${vendorId}`);
+      return response.data;
+    }
+  );
+
+  const { data: pendingPayments } = useQuery(
+    ['pendingPayments', vendorId],
+    async () => {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/payments?vendorId=${vendorId}&status=PENDING`);
+      return response.data;
+    }
+  );
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 shadow-lg rounded-md bg-white">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium text-gray-900">Payment Dashboard</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <XMarkIcon className="h-6 w-6" />
+          </button>
+        </div>
+
+        {/* Credit Summary */}
+        <div className="bg-gray-50 p-4 rounded-lg mb-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-gray-600">Available Credit</p>
+              <p className="text-lg font-semibold text-blue-600">
+                {formatCurrency((vendor?.availableCredit || 0) - (vendor?.usedCredit || 0))}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Used Credit</p>
+              <p className="text-lg font-semibold text-orange-600">
+                {formatCurrency(vendor?.usedCredit || 0)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Pending Payments */}
+        <div className="mb-6">
+          <h4 className="font-medium text-gray-900 mb-3">Pending Payments</h4>
+          {pendingPayments && pendingPayments.length > 0 ? (
+            <div className="space-y-3">
+              {pendingPayments.map((payment: any) => (
+                <div key={payment.id} className="flex justify-between items-center p-3 border border-gray-200 rounded-lg">
+                  <div>
+                    <p className="font-medium">{payment.type.replace('_', ' ')}</p>
+                    <p className="text-sm text-gray-600">
+                      Due: {new Date(payment.dueDate).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">{formatCurrency(payment.amount)}</p>
+                    <button
+                      onClick={() => {
+                        onClose();
+                        // Navigate to payment page
+                        window.location.href = `/payment/${payment.id}?vendorId=${vendorId}&orderId=${payment.orderId}`;
+                      }}
+                      className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                    >
+                      Pay Now
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-4">No pending payments</p>
+          )}
+        </div>
+
+        {/* Quick Actions */}
+        <div className="space-y-2">
+          <button
+            onClick={() => {
+              onClose();
+              // Navigate to create order with pay later
+              window.location.href = `/vendor/${vendorId}/order/create`;
+            }}
+            className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700"
+          >
+            Order with Pay Later
+          </button>
+          <button
+            onClick={onClose}
+            className="w-full border border-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );
