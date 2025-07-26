@@ -27,7 +27,7 @@ const PaymentPage: React.FC = () => {
   const { id: paymentId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user, isAuthenticated, getUserId } = useAuth();
+  const { user, isAuthenticated, isLoading, getUserId } = useAuth();
   const [selectedMethod, setSelectedMethod] = useState<string>('UPI');
   const [upiId, setUpiId] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -36,13 +36,13 @@ const PaymentPage: React.FC = () => {
   const vendorId = getUserId();
 
   // Check if we should enable queries
-  const shouldEnableQueries = isAuthenticated && vendorId && user?.type === 'vendor';
+  const shouldEnableQueries = !isLoading && isAuthenticated && vendorId && user?.type === 'vendor';
 
   // Mock vendor ID (in real app, this would come from auth context)
   const orderId = new URLSearchParams(window.location.search).get('orderId');
 
   // Fetch payment details
-  const { data: payment, isLoading } = useQuery(
+  const { data: payment, isLoading: isPaymentLoading } = useQuery(
     ['payment', paymentId],
     async () => {
       const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/payments/${paymentId}`);
@@ -65,6 +65,11 @@ const PaymentPage: React.FC = () => {
 
   // Validate authentication
   React.useEffect(() => {
+    // Don't do anything while authentication is loading
+    if (isLoading) {
+      return;
+    }
+
     if (!isAuthenticated || !vendorId) {
       toast.error('Please login to access payment page.');
       navigate('/', { replace: true });
@@ -77,7 +82,7 @@ const PaymentPage: React.FC = () => {
       navigate('/', { replace: true });
       return;
     }
-  }, [isAuthenticated, vendorId, user, navigate]);
+  }, [isLoading, isAuthenticated, vendorId, user, navigate]);
 
   // Process payment mutation
   const processPaymentMutation = useMutation(
@@ -104,12 +109,14 @@ const PaymentPage: React.FC = () => {
   );
 
   // Show loading if not authenticated
-  if (!isAuthenticated || !vendorId || user?.type !== 'vendor') {
+  if (isLoading || (!isAuthenticated || !vendorId || user?.type !== 'vendor')) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">
+            {isLoading ? 'Loading...' : 'Validating access...'}
+          </p>
         </div>
       </div>
     );
@@ -207,7 +214,7 @@ const PaymentPage: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  if (isPaymentLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-2xl mx-auto">

@@ -24,7 +24,7 @@ const GroupDetails: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const socket = useSocket();
-  const { user, isAuthenticated, getUserId } = useAuth();
+  const { user, isAuthenticated, isLoading, getUserId } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [newMessage, setNewMessage] = useState('');
   const [isJoining, setIsJoining] = useState(false);
@@ -35,6 +35,11 @@ const GroupDetails: React.FC = () => {
 
   // Validate authentication and redirect if not logged in
   React.useEffect(() => {
+    // Don't do anything while authentication is loading
+    if (isLoading) {
+      return;
+    }
+
     if (!isAuthenticated || !vendorId) {
       toast.error('Please login to access group details.');
       navigate('/', { replace: true });
@@ -47,13 +52,13 @@ const GroupDetails: React.FC = () => {
       navigate('/', { replace: true });
       return;
     }
-  }, [isAuthenticated, vendorId, user, navigate]);
+  }, [isLoading, isAuthenticated, vendorId, user, navigate]);
 
   // Check if we should enable queries
-  const shouldEnableQueries = isAuthenticated && vendorId && user?.type === 'vendor';
+  const shouldEnableQueries = !isLoading && isAuthenticated && vendorId && user?.type === 'vendor';
 
   // Fetch group details
-  const { data: group, isLoading } = useQuery(
+  const { data: group, isLoading: isGroupLoading } = useQuery(
     ['group', groupId],
     async () => {
       const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/groups/${groupId}`);
@@ -197,12 +202,14 @@ const GroupDetails: React.FC = () => {
   }, [messages]);
 
   // Show loading if not authenticated
-  if (!isAuthenticated || !vendorId || user?.type !== 'vendor') {
+  if (isLoading || (!isAuthenticated || !vendorId || user?.type !== 'vendor')) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">
+            {isLoading ? 'Loading...' : 'Validating access...'}
+          </p>
         </div>
       </div>
     );
@@ -238,7 +245,7 @@ const GroupDetails: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  if (isGroupLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-7xl mx-auto">
