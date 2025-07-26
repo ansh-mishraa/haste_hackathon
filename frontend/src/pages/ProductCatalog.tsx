@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useQuery } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.tsx';
-import { MagnifyingGlassIcon, FunnelIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, FunnelIcon, ShoppingCartIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -25,10 +25,19 @@ const useDebounce = (value: string, delay: number) => {
 
 const ProductCatalog: React.FC = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, isAuthenticated, isLoading, getUserId } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [cart, setCart] = useState<any[]>([]);
+  const [showCustomProductModal, setShowCustomProductModal] = useState(false);
+  const [customProductForm, setCustomProductForm] = useState({
+    name: '',
+    category: '',
+    unit: '',
+    description: '',
+    marketPrice: ''
+  });
   
   // Debounce search term to prevent excessive API calls
   const debouncedSearchTerm = useDebounce(searchTerm, 500); // 500ms delay
@@ -59,6 +68,39 @@ const ProductCatalog: React.FC = () => {
 
   // Check if we should enable queries
   const shouldEnableQueries = !isLoading && isAuthenticated && vendorId && user?.type === 'vendor';
+
+  // Create custom product mutation
+  const createCustomProductMutation = useMutation(
+    async (productData: any) => {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/products`, {
+        ...productData,
+        isCustom: true
+      });
+      return response.data;
+    },
+    {
+      onSuccess: (newProduct) => {
+        toast.success('Custom product created successfully!');
+        queryClient.invalidateQueries(['products']);
+        
+        // Automatically add the new custom product to cart
+        handleAddToOrder(newProduct);
+        
+        // Reset form and close modal
+        setCustomProductForm({
+          name: '',
+          category: '',
+          unit: '',
+          description: '',
+          marketPrice: ''
+        });
+        setShowCustomProductModal(false);
+      },
+      onError: (error: any) => {
+        toast.error(error.response?.data?.error || 'Failed to create custom product');
+      }
+    }
+  );
 
   // Fetch products with debounced search
   const { data: products, isLoading: isProductsLoading } = useQuery(
@@ -165,6 +207,38 @@ const ProductCatalog: React.FC = () => {
     navigate(`/vendor/${vendorId}/order/create?cart=${cartData}`);
   };
 
+  // Custom product handlers
+  const handleCreateCustomProduct = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customProductForm.name || !customProductForm.category || !customProductForm.unit) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    createCustomProductMutation.mutate({
+      ...customProductForm,
+      marketPrice: customProductForm.marketPrice ? parseFloat(customProductForm.marketPrice) : null
+    });
+  };
+
+  const resetCustomProductForm = () => {
+    setCustomProductForm({
+      name: '',
+      category: '',
+      unit: '',
+      description: '',
+      marketPrice: ''
+    });
+    setShowCustomProductModal(false);
+  };
+
+  const commonCategories = [
+    'Vegetables', 'Fruits', 'Grains', 'Dairy', 'Spices', 'Bread', 
+    'Ready-to-Cook', 'Ingredients', 'Sweeteners', 'Oil', 'Pulses'
+  ];
+
+  const commonUnits = ['kg', 'gram', 'liter', 'pieces', 'packet', 'bottle', 'bag'];
+
   // Show loading indicator when search is being typed but not yet debounced
   const isSearching = searchTerm !== debouncedSearchTerm;
 
@@ -239,6 +313,17 @@ const ProductCatalog: React.FC = () => {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Add Custom Product Button */}
+            <div>
+              <button
+                onClick={() => setShowCustomProductModal(true)}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              >
+                <PlusIcon className="h-4 w-4 mr-2" />
+                Add Custom Product
+              </button>
             </div>
           </div>
         </div>
@@ -399,6 +484,126 @@ const ProductCatalog: React.FC = () => {
               >
                 Create Order
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Custom Product Modal */}
+        {showCustomProductModal && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 shadow-lg rounded-md bg-white">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Add Custom Product</h3>
+                <button
+                  onClick={resetCustomProductForm}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateCustomProduct} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Product Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={customProductForm.name}
+                      onChange={(e) => setCustomProductForm(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      placeholder="Enter product name"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Category *
+                    </label>
+                    <select
+                      value={customProductForm.category}
+                      onChange={(e) => setCustomProductForm(prev => ({ ...prev, category: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      required
+                    >
+                      <option value="">Select category</option>
+                      {commonCategories.map(category => (
+                        <option key={category} value={category}>{category}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Unit *
+                    </label>
+                    <select
+                      value={customProductForm.unit}
+                      onChange={(e) => setCustomProductForm(prev => ({ ...prev, unit: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      required
+                    >
+                      <option value="">Select unit</option>
+                      {commonUnits.map(unit => (
+                        <option key={unit} value={unit}>{unit}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Estimated Price (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={customProductForm.marketPrice}
+                      onChange={(e) => setCustomProductForm(prev => ({ ...prev, marketPrice: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      placeholder="Enter estimated price per unit"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    value={customProductForm.description}
+                    onChange={(e) => setCustomProductForm(prev => ({ ...prev, description: e.target.value }))}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Describe your custom product requirement"
+                  />
+                </div>
+
+                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                  <p className="text-sm text-yellow-800">
+                    <strong>Note:</strong> This custom product will be added to your order and suppliers can bid on it along with your other items.
+                  </p>
+                </div>
+
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={resetCustomProductForm}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={createCustomProductMutation.isLoading}
+                    className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {createCustomProductMutation.isLoading ? 'Adding...' : 'Add to Cart'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

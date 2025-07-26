@@ -13,10 +13,296 @@ import {
   XMarkIcon,
   PlusIcon,
   BanknotesIcon,
-  StarIcon
+  StarIcon,
+  ShoppingBagIcon,
+  PhotoIcon
 } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+
+// Manage Products Tab Component
+const ManageProductsTab: React.FC<{ supplierId: string }> = ({ supplierId }) => {
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [productForm, setProductForm] = useState({
+    name: '',
+    category: '',
+    unit: '',
+    description: '',
+    imageUrl: '',
+    marketPrice: ''
+  });
+
+  const queryClient = useQueryClient();
+
+  // Fetch supplier's products
+  const { data: supplierProducts, isLoading: isLoadingProducts } = useQuery(
+    ['supplierProducts', supplierId],
+    async () => {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/products/supplier/${supplierId}`);
+      return response.data;
+    },
+    { enabled: !!supplierId }
+  );
+
+  // Create product mutation
+  const createProductMutation = useMutation(
+    async (productData: any) => {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/products/supplier/${supplierId}`, productData);
+      return response.data;
+    },
+    {
+      onSuccess: () => {
+        toast.success('Product added successfully!');
+        queryClient.invalidateQueries(['supplierProducts', supplierId]);
+        setShowAddForm(false);
+        setProductForm({
+          name: '',
+          category: '',
+          unit: '',
+          description: '',
+          imageUrl: '',
+          marketPrice: ''
+        });
+      },
+      onError: (error: any) => {
+        toast.error(error.response?.data?.error || 'Failed to add product');
+      }
+    }
+  );
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!productForm.name || !productForm.category || !productForm.unit) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    createProductMutation.mutate({
+      ...productForm,
+      marketPrice: productForm.marketPrice ? parseFloat(productForm.marketPrice) : null
+    });
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const commonCategories = [
+    'Vegetables', 'Fruits', 'Grains', 'Dairy', 'Spices', 'Bread', 
+    'Ready-to-Cook', 'Ingredients', 'Sweeteners', 'Oil', 'Pulses'
+  ];
+
+  const commonUnits = ['kg', 'gram', 'liter', 'pieces', 'packet', 'bottle', 'bag'];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-medium text-gray-900">Manage Products</h3>
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center"
+        >
+          <PlusIcon className="h-5 w-5 mr-2" />
+          Add Product
+        </button>
+      </div>
+
+      {/* Add Product Form */}
+      {showAddForm && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h4 className="text-lg font-medium text-gray-900">Add New Product</h4>
+            <button
+              onClick={() => setShowAddForm(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <XMarkIcon className="h-6 w-6" />
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Product Name *
+                </label>
+                <input
+                  type="text"
+                  value={productForm.name}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter product name"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Category *
+                </label>
+                <select
+                  value={productForm.category}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, category: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">Select category</option>
+                  {commonCategories.map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Unit *
+                </label>
+                <select
+                  value={productForm.unit}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, unit: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">Select unit</option>
+                  {commonUnits.map(unit => (
+                    <option key={unit} value={unit}>{unit}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Market Price (₹)
+                </label>
+                <input
+                  type="number"
+                  value={productForm.marketPrice}
+                  onChange={(e) => setProductForm(prev => ({ ...prev, marketPrice: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter price per unit"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              <textarea
+                value={productForm.description}
+                onChange={(e) => setProductForm(prev => ({ ...prev, description: e.target.value }))}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter product description"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Image URL
+              </label>
+              <input
+                type="url"
+                value={productForm.imageUrl}
+                onChange={(e) => setProductForm(prev => ({ ...prev, imageUrl: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter image URL"
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowAddForm(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={createProductMutation.isLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                {createProductMutation.isLoading ? 'Adding...' : 'Add Product'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Products List */}
+      <div>
+        <h4 className="text-lg font-medium text-gray-900 mb-4">Your Products</h4>
+        
+        {isLoadingProducts ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="animate-pulse bg-gray-100 h-32 rounded-lg"></div>
+            ))}
+          </div>
+        ) : supplierProducts?.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {supplierProducts.map((product: any) => (
+              <div key={product.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1">
+                    <h5 className="font-medium text-gray-900">{product.name}</h5>
+                    <p className="text-sm text-gray-500">{product.category}</p>
+                  </div>
+                  {product.imageUrl && (
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      className="w-12 h-12 object-cover rounded ml-3"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  )}
+                </div>
+                
+                <div className="space-y-1 text-sm">
+                  <p><span className="font-medium">Unit:</span> {product.unit}</p>
+                  {product.marketPrice && (
+                    <p><span className="font-medium">Price:</span> {formatCurrency(product.marketPrice)}/{product.unit}</p>
+                  )}
+                  {product.description && (
+                    <p className="text-gray-600">{product.description}</p>
+                  )}
+                </div>
+                
+                <div className="mt-3 text-xs text-gray-500">
+                  Added: {new Date(product.createdAt).toLocaleDateString()}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <ShoppingBagIcon className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No products yet</h3>
+            <p className="mt-1 text-sm text-gray-500">Get started by adding your first product.</p>
+            <div className="mt-6">
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+              >
+                <PlusIcon className="h-4 w-4 mr-2" />
+                Add Product
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const SupplierDashboard: React.FC = () => {
   const { id: supplierId } = useParams<{ id: string }>();
@@ -346,12 +632,13 @@ const SupplierDashboard: React.FC = () => {
         {/* Navigation Tabs */}
         <div className="bg-white shadow rounded-lg mb-8">
           <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8 px-6">
+            <nav className="-mb-px flex space-x-8 px-6 overflow-x-auto">
               {[
                 { id: 'overview', name: 'Overview', icon: ChartBarIcon },
                 { id: 'available-orders', name: 'Available Orders', icon: DocumentTextIcon },
                 { id: 'my-bids', name: 'My Bids', icon: ClockIcon },
-                { id: 'active-orders', name: 'Active Orders', icon: TruckIcon }
+                { id: 'active-orders', name: 'Active Orders', icon: TruckIcon },
+                { id: 'manage-products', name: 'Manage Products', icon: PlusIcon }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -634,6 +921,11 @@ const SupplierDashboard: React.FC = () => {
                   )}
                 </div>
               </div>
+            )}
+
+            {/* Manage Products Tab */}
+            {activeTab === 'manage-products' && (
+              <ManageProductsTab supplierId={currentSupplierId} />
             )}
           </div>
         </div>

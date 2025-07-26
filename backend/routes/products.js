@@ -123,7 +123,9 @@ router.post('/', async (req, res) => {
       unit,
       description,
       imageUrl,
-      marketPrice
+      marketPrice,
+      supplierId,
+      isCustom
     } = req.body;
 
     const product = await prisma.product.create({
@@ -133,7 +135,9 @@ router.post('/', async (req, res) => {
         unit,
         description,
         imageUrl,
-        marketPrice
+        marketPrice,
+        supplierId,
+        isCustom: isCustom || false
       }
     });
 
@@ -143,6 +147,73 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Product with this name already exists' });
     }
     res.status(500).json({ error: 'Failed to create product' });
+  }
+});
+
+// Create product by supplier
+router.post('/supplier/:supplierId', async (req, res) => {
+  try {
+    const { supplierId } = req.params;
+    const {
+      name,
+      category,
+      unit,
+      description,
+      imageUrl,
+      marketPrice
+    } = req.body;
+
+    // Verify supplier exists
+    const supplier = await prisma.supplier.findUnique({
+      where: { id: supplierId }
+    });
+
+    if (!supplier) {
+      return res.status(404).json({ error: 'Supplier not found' });
+    }
+
+    const product = await prisma.product.create({
+      data: {
+        name,
+        category,
+        unit,
+        description,
+        imageUrl,
+        marketPrice,
+        supplierId,
+        isCustom: false
+      },
+      include: {
+        supplier: true
+      }
+    });
+
+    res.status(201).json(product);
+  } catch (error) {
+    if (error.code === 'P2002') {
+      return res.status(400).json({ error: 'Product with this name already exists' });
+    }
+    res.status(500).json({ error: 'Failed to create product' });
+  }
+});
+
+// Get products by supplier
+router.get('/supplier/:supplierId', async (req, res) => {
+  try {
+    const { supplierId } = req.params;
+
+    const products = await prisma.product.findMany({
+      where: { supplierId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        supplier: true
+      }
+    });
+
+    res.json(products);
+  } catch (error) {
+    console.error('Error fetching supplier products:', error);
+    res.status(500).json({ error: 'Failed to fetch products' });
   }
 });
 
