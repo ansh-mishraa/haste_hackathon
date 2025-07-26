@@ -158,12 +158,22 @@ const GroupFinderModal: React.FC<{
   onClose: () => void;
   onJoinGroup: (groupId: string) => void;
 }> = ({ vendorId, onClose, onJoinGroup }) => {
-  const [searchRadius, setSearchRadius] = useState(2);
+  const [selectedLocation, setSelectedLocation] = useState('');
+  
+  // Fetch available locations
+  const { data: availableLocations } = useQuery(
+    'groupLocations',
+    async () => {
+      const response = await axios.get(`${API_URL}/api/groups/locations`);
+      return response.data;
+    }
+  );
   
   const { data: availableGroups, isLoading } = useQuery(
-    ['groupSuggestions', vendorId, searchRadius],
+    ['groupSuggestions', vendorId, selectedLocation],
     async () => {
-      const response = await axios.get(`${API_URL}/api/groups/suggestions/${vendorId}?radius=${searchRadius}`);
+      const params = selectedLocation ? `?location=${encodeURIComponent(selectedLocation)}` : '';
+      const response = await axios.get(`${API_URL}/api/groups/suggestions/${vendorId}${params}`);
       return response.data;
     }
   );
@@ -188,17 +198,22 @@ const GroupFinderModal: React.FC<{
         </div>
 
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Search Radius (km)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Location</label>
           <select
-            value={searchRadius}
-            onChange={(e) => setSearchRadius(parseInt(e.target.value))}
+            value={selectedLocation}
+            onChange={(e) => setSelectedLocation(e.target.value)}
             className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
           >
-            <option value={1}>1 km</option>
-            <option value={2}>2 km</option>
-            <option value={5}>5 km</option>
-            <option value={10}>10 km</option>
+            <option value="">All Locations (Show groups from my area)</option>
+            {availableLocations?.map((location: string) => (
+              <option key={location} value={location}>
+                {location}
+              </option>
+            ))}
           </select>
+          <p className="text-xs text-gray-500 mt-1">
+            Groups will be filtered by pickup location. Leave empty to show groups from your business area.
+          </p>
         </div>
 
         {isLoading ? (
@@ -246,7 +261,7 @@ const GroupFinderModal: React.FC<{
             <UserGroupIcon className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-4 text-lg font-medium text-gray-900">No groups found</h3>
             <p className="mt-2 text-sm text-gray-500">
-              No groups are currently forming in your area. Try increasing the search radius or create your own group.
+              No groups are currently forming in the selected location. Try selecting a different location or create your own group.
             </p>
           </div>
         )}

@@ -489,7 +489,7 @@ router.post('/:id/messages', async (req, res) => {
 router.get('/suggestions/:vendorId', async (req, res) => {
   try {
     const vendorId = req.params.vendorId;
-    const { latitude, longitude, radius = 2 } = req.query;
+    const { location } = req.query;
 
     // Get vendor info
     const vendor = await prisma.vendor.findUnique({
@@ -500,14 +500,25 @@ router.get('/suggestions/:vendorId', async (req, res) => {
       return res.status(404).json({ error: 'Vendor not found' });
     }
 
-    // Find groups that are forming and within proximity
+    // Find groups that are forming and match location preferences
+    let whereClause = {
+      status: 'FORMING',
+      confirmationDeadline: {
+        gt: new Date()
+      }
+    };
+
+    // Filter by location if specified, otherwise show groups in vendor's business location
+    const targetLocation = location || vendor.businessLocation;
+    if (targetLocation) {
+      whereClause.pickupLocation = {
+        contains: targetLocation,
+        mode: 'insensitive'
+      };
+    }
+
     const groups = await prisma.buyingGroup.findMany({
-      where: {
-        status: 'FORMING',
-        confirmationDeadline: {
-          gt: new Date()
-        }
-      },
+      where: whereClause,
       include: {
         memberships: {
           include: {
@@ -516,38 +527,65 @@ router.get('/suggestions/:vendorId', async (req, res) => {
                 id: true,
                 name: true,
                 businessType: true,
-                latitude: true,
-                longitude: true
+                businessLocation: true
               }
             }
           }
         }
-      }
+      },
+      orderBy: { createdAt: 'desc' }
     });
 
-    // Filter by proximity and exclude groups vendor is already in
+    // Filter out groups vendor is already in
     const suggestions = groups.filter(group => {
-      // Check if vendor is already a member
       const isAlreadyMember = group.memberships.some(m => m.vendorId === vendorId);
-      if (isAlreadyMember) return false;
-
-      // Check proximity
-      if (latitude && longitude && group.pickupLatitude && group.pickupLongitude) {
-        const distance = calculateDistance(
-          parseFloat(latitude),
-          parseFloat(longitude),
-          group.pickupLatitude,
-          group.pickupLongitude
-        );
-        return distance <= parseFloat(radius);
-      }
-
-      return true;
+      return !isAlreadyMember;
     });
 
     res.json(suggestions);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch group suggestions' });
+  }
+});
+
+// Get available pickup locations for group filtering
+router.get('/locations', async (req, res) => {
+  try {
+    // Get unique pickup locations from existing groups
+    const groupLocations = await prisma.buyingGroup.findMany({
+      select: { pickupLocation: true },
+      distinct: ['pickupLocation'],
+      where: {
+        pickupLocation: {
+          not: null
+        }
+      }
+    });
+
+    // Get unique business locations from vendors
+    const vendorLocations = await prisma.vendor.findMany({
+      select: { businessLocation: true },
+      distinct: ['businessLocation'],
+      where: {
+        businessLocation: {
+          not: null
+        }
+      }
+    });
+
+    // Combine and deduplicate locations
+    const allLocations = [
+      ...groupLocations.map(g => g.pickupLocation),
+      ...vendorLocations.map(v => v.businessLocation)
+    ];
+
+    const uniqueLocations = [...new Set(allLocations)]
+      .filter(location => location && location.trim().length > 0)
+      .sort();
+
+    res.json(uniqueLocations);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch locations' });
   }
 });
 
