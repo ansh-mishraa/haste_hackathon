@@ -12,7 +12,8 @@ import {
   ClockIcon,
   CurrencyRupeeIcon,
   XMarkIcon,
-  MapPinIcon
+  MapPinIcon,
+  CheckIcon
 } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -260,10 +261,20 @@ const PaymentModal: React.FC<{
   onClose: () => void;
   onPaymentComplete: () => void;
 }> = ({ vendorId, onClose, onPaymentComplete }) => {
+  const [activeTab, setActiveTab] = useState<'transactions' | 'pending'>('transactions');
+  
   const { data: vendor } = useQuery(
     ['vendor', vendorId],
     async () => {
       const response = await axios.get(`${API_URL}/api/vendors/${vendorId}`);
+      return response.data;
+    }
+  );
+
+  const { data: allTransactions } = useQuery(
+    ['allTransactions', vendorId],
+    async () => {
+      const response = await axios.get(`${API_URL}/api/payments?vendorId=${vendorId}`);
       return response.data;
     }
   );
@@ -284,81 +295,249 @@ const PaymentModal: React.FC<{
     }).format(amount);
   };
 
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'COMPLETED': return 'bg-green-100 text-green-800';
+      case 'PENDING': return 'bg-yellow-100 text-yellow-800';
+      case 'FAILED': return 'bg-red-100 text-red-800';
+      case 'CANCELLED': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getPaymentMethodIcon = (method: string) => {
+    switch (method) {
+      case 'UPI': return '📱';
+      case 'CASH': return '💵';
+      case 'CREDIT': return '💳';
+      case 'CARD': return '💳';
+      default: return '💰';
+    }
+  };
+
+  const getPaymentTypeColor = (type: string) => {
+    switch (type) {
+      case 'ORDER_PAYMENT': return 'text-blue-600';
+      case 'CREDIT_PURCHASE': return 'text-purple-600';
+      case 'REFUND': return 'text-green-600';
+      case 'PENALTY': return 'text-red-600';
+      default: return 'text-gray-600';
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 shadow-lg rounded-md bg-white">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium text-gray-900">Payment Dashboard</h3>
+      <div className="relative top-10 mx-auto p-5 border w-11/12 md:w-4/5 lg:w-3/4 shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-medium text-gray-900">Payment & Transaction Dashboard</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
 
         {/* Credit Summary */}
-        <div className="bg-gray-50 p-4 rounded-lg mb-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-gray-600">Available Credit</p>
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Total Credit Limit</p>
               <p className="text-lg font-semibold text-blue-600">
-                {formatCurrency((vendor?.availableCredit || 0) - (vendor?.usedCredit || 0))}
+                {formatCurrency(vendor?.availableCredit || 0)}
               </p>
             </div>
-            <div>
+            <div className="text-center">
               <p className="text-sm text-gray-600">Used Credit</p>
               <p className="text-lg font-semibold text-orange-600">
                 {formatCurrency(vendor?.usedCredit || 0)}
               </p>
             </div>
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Available Credit</p>
+              <p className="text-lg font-semibold text-green-600">
+                {formatCurrency((vendor?.availableCredit || 0) - (vendor?.usedCredit || 0))}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Credit Utilization</p>
+              <p className="text-lg font-semibold text-purple-600">
+                {vendor?.availableCredit ? Math.round(((vendor?.usedCredit || 0) / vendor.availableCredit) * 100) : 0}%
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Pending Payments */}
+        {/* Tab Navigation */}
+        <div className="flex space-x-1 mb-6 bg-gray-100 p-1 rounded-lg">
+          <button
+            onClick={() => setActiveTab('transactions')}
+            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'transactions'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            All Transactions ({allTransactions?.length || 0})
+          </button>
+          <button
+            onClick={() => setActiveTab('pending')}
+            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'pending'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Pending Payments ({pendingPayments?.length || 0})
+          </button>
+        </div>
+
+        {/* Transaction Content */}
         <div className="mb-6">
-          <h4 className="font-medium text-gray-900 mb-3">Pending Payments</h4>
-          {pendingPayments && pendingPayments.length > 0 ? (
-            <div className="space-y-3">
-              {pendingPayments.map((payment: any) => (
-                <div key={payment.id} className="flex justify-between items-center p-3 border border-gray-200 rounded-lg">
-                  <div>
-                    <p className="font-medium">{payment.type.replace('_', ' ')}</p>
-                    <p className="text-sm text-gray-600">
-                      Due: {new Date(payment.dueDate).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{formatCurrency(payment.amount)}</p>
-                    <button
-                      onClick={() => {
-                        onClose();
-                        window.location.href = `/payment/${payment.id}?vendorId=${vendorId}&orderId=${payment.orderId}`;
-                      }}
-                      className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-                    >
-                      Pay Now
-                    </button>
-                  </div>
+          {activeTab === 'transactions' ? (
+            <div>
+              <h4 className="font-medium text-gray-900 mb-4 flex items-center">
+                <ChartBarIcon className="h-5 w-5 mr-2" />
+                Transaction History
+              </h4>
+              {allTransactions && allTransactions.length > 0 ? (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {allTransactions.map((transaction: any) => (
+                    <div key={transaction.id} className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center space-x-3">
+                          <span className="text-2xl">{getPaymentMethodIcon(transaction.method)}</span>
+                          <div>
+                            <p className={`font-medium ${getPaymentTypeColor(transaction.type)}`}>
+                              {transaction.type.replace('_', ' ')}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              {formatDate(transaction.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-semibold text-gray-900">
+                            {transaction.type === 'REFUND' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                          </p>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(transaction.status)}`}>
+                            {transaction.status}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-500">Payment Method</p>
+                          <p className="font-medium">{transaction.method}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Transaction ID</p>
+                          <p className="font-medium font-mono">{transaction.id.slice(0, 8)}...</p>
+                        </div>
+                        {transaction.orderId && (
+                          <div>
+                            <p className="text-gray-500">Order ID</p>
+                            <p className="font-medium font-mono">{transaction.orderId.slice(0, 8)}...</p>
+                          </div>
+                        )}
+                        {transaction.creditUsed && (
+                          <div>
+                            <p className="text-gray-500">Credit Used</p>
+                            <p className="font-medium text-orange-600">{formatCurrency(transaction.creditUsed)}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {transaction.description && (
+                        <div className="mt-3 pt-3 border-t border-gray-100">
+                          <p className="text-sm text-gray-600">{transaction.description}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : (
+                <div className="text-center py-8">
+                  <CreditCardIcon className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="mt-4 text-lg font-medium text-gray-900">No transactions yet</h3>
+                  <p className="mt-2 text-sm text-gray-500">
+                    Your transaction history will appear here once you make your first purchase.
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
-            <p className="text-gray-500 text-center py-4">No pending payments</p>
+            <div>
+              <h4 className="font-medium text-gray-900 mb-4 flex items-center">
+                <ClockIcon className="h-5 w-5 mr-2" />
+                Pending Payments
+              </h4>
+              {pendingPayments && pendingPayments.length > 0 ? (
+                <div className="space-y-3">
+                  {pendingPayments.map((payment: any) => (
+                    <div key={payment.id} className="flex justify-between items-center p-4 border border-gray-200 rounded-lg hover:border-orange-300 transition-colors">
+                      <div className="flex items-center space-x-3">
+                        <span className="text-2xl">⏰</span>
+                        <div>
+                          <p className="font-medium text-orange-600">{payment.type.replace('_', ' ')}</p>
+                          <p className="text-sm text-gray-600">
+                            Due: {new Date(payment.dueDate).toLocaleDateString()}
+                          </p>
+                          {payment.orderId && (
+                            <p className="text-xs text-gray-500">Order: {payment.orderId.slice(0, 8)}...</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-semibold text-gray-900">{formatCurrency(payment.amount)}</p>
+                        <button
+                          onClick={() => {
+                            onClose();
+                            window.location.href = `/payment/${payment.id}?vendorId=${vendorId}&orderId=${payment.orderId}`;
+                          }}
+                          className="text-sm bg-orange-600 text-white px-3 py-1 rounded hover:bg-orange-700 transition-colors"
+                        >
+                          Pay Now
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <CheckIcon className="mx-auto h-12 w-12 text-green-400" />
+                  <h3 className="mt-4 text-lg font-medium text-gray-900">All caught up!</h3>
+                  <p className="mt-2 text-sm text-gray-500">
+                    You have no pending payments at the moment.
+                  </p>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
         {/* Quick Actions */}
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <button
             onClick={() => {
               onClose();
               window.location.href = `/vendor/${vendorId}/order/create`;
             }}
-            className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700"
+            className="bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 transition-colors font-medium"
           >
-            Order with Pay Later
+            🛒 Order with Pay Later
           </button>
           <button
             onClick={onClose}
-            className="w-full border border-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50"
+            className="border border-gray-300 text-gray-700 py-3 px-4 rounded-md hover:bg-gray-50 transition-colors font-medium"
           >
             Close
           </button>
@@ -642,6 +821,75 @@ const VendorDashboard: React.FC = () => {
 
   // Get authenticated user's vendor ID
   const authenticatedVendorId = getUserId();
+  const currentVendorId = authenticatedVendorId;
+
+  // Check if we should enable queries
+  const shouldEnableQueries = isAuthenticated && authenticatedVendorId && user?.type === 'vendor';
+
+  // Fetch vendor dashboard data
+  const { data: dashboardData, isLoading } = useQuery(
+    ['vendorDashboard', currentVendorId],
+    async () => {
+      const response = await axios.get(`${API_URL}/api/vendors/${currentVendorId}/dashboard`);
+      return response.data;
+    },
+    {
+      enabled: shouldEnableQueries && !!currentVendorId,
+      refetchInterval: 30000,
+      onError: (error: any) => {
+        if (error.response?.status === 404) {
+          toast.error('Vendor not found. Please login again.');
+          logout();
+          navigate('/', { replace: true });
+        }
+      }
+    }
+  );
+
+  // Fetch vendor details
+  const { data: vendor } = useQuery(
+    ['vendor', currentVendorId],
+    async () => {
+      const response = await axios.get(`${API_URL}/api/vendors/${currentVendorId}`);
+      return response.data;
+    },
+    { 
+      enabled: shouldEnableQueries && !!currentVendorId,
+      onError: (error: any) => {
+        if (error.response?.status === 404) {
+          toast.error('Vendor not found. Please login again.');
+          logout();
+          navigate('/', { replace: true });
+        }
+      }
+    }
+  );
+
+  // Fetch vendor's orders with bids
+  const { data: vendorOrders } = useQuery(
+    ['vendorOrders', currentVendorId],
+    async () => {
+      const response = await axios.get(`${API_URL}/api/orders?vendorId=${currentVendorId}&includeBids=true`);
+      return response.data;
+    },
+    { 
+      enabled: shouldEnableQueries && !!currentVendorId,
+      refetchInterval: 30000
+    }
+  );
+
+  // Fetch incoming bids for vendor's orders
+  const { data: incomingBids } = useQuery(
+    ['vendorBids', currentVendorId],
+    async () => {
+      const response = await axios.get(`${API_URL}/api/vendors/${currentVendorId}/bids`);
+      return response.data;
+    },
+    { 
+      enabled: shouldEnableQueries && !!currentVendorId,
+      refetchInterval: 30000
+    }
+  );
 
   // Validate authentication and vendor access
   useEffect(() => {
@@ -680,73 +928,6 @@ const VendorDashboard: React.FC = () => {
       </div>
     );
   }
-
-  const currentVendorId = authenticatedVendorId;
-
-  // Fetch vendor dashboard data
-  const { data: dashboardData, isLoading } = useQuery(
-    ['vendorDashboard', currentVendorId],
-    async () => {
-      const response = await axios.get(`${API_URL}/api/vendors/${currentVendorId}/dashboard`);
-      return response.data;
-    },
-    {
-      enabled: !!currentVendorId,
-      refetchInterval: 30000,
-      onError: (error: any) => {
-        if (error.response?.status === 404) {
-          toast.error('Vendor not found. Please login again.');
-          logout();
-          navigate('/', { replace: true });
-        }
-      }
-    }
-  );
-
-  // Fetch vendor details
-  const { data: vendor } = useQuery(
-    ['vendor', currentVendorId],
-    async () => {
-      const response = await axios.get(`${API_URL}/api/vendors/${currentVendorId}`);
-      return response.data;
-    },
-    { 
-      enabled: !!currentVendorId,
-      onError: (error: any) => {
-        if (error.response?.status === 404) {
-          toast.error('Vendor not found. Please login again.');
-          logout();
-          navigate('/', { replace: true });
-        }
-      }
-    }
-  );
-
-  // Fetch vendor's orders with bids
-  const { data: vendorOrders } = useQuery(
-    ['vendorOrders', currentVendorId],
-    async () => {
-      const response = await axios.get(`${API_URL}/api/orders?vendorId=${currentVendorId}&includeBids=true`);
-      return response.data;
-    },
-    { 
-      enabled: !!currentVendorId,
-      refetchInterval: 30000
-    }
-  );
-
-  // Fetch incoming bids for vendor's orders
-  const { data: incomingBids } = useQuery(
-    ['vendorBids', currentVendorId],
-    async () => {
-      const response = await axios.get(`${API_URL}/api/vendors/${currentVendorId}/bids`);
-      return response.data;
-    },
-    { 
-      enabled: !!currentVendorId,
-      refetchInterval: 30000
-    }
-  );
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {

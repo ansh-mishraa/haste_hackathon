@@ -28,6 +28,69 @@ const SupplierDashboard: React.FC = () => {
 
   // Get authenticated user's supplier ID
   const authenticatedSupplierId = getUserId();
+  const currentSupplierId = authenticatedSupplierId;
+
+  // Check if we should enable queries
+  const shouldEnableQueries = isAuthenticated && authenticatedSupplierId && user?.type === 'supplier';
+
+  // Fetch supplier dashboard data
+  const { data: dashboardData, isLoading, error } = useQuery(
+    ['supplierDashboard', currentSupplierId],
+    async () => {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}/dashboard`);
+      return response.data;
+    },
+    {
+      enabled: shouldEnableQueries && !!currentSupplierId,
+      refetchInterval: 30000, // Refresh every 30 seconds
+      onError: (error: any) => {
+        if (error.response?.status === 404) {
+          toast.error('Supplier not found. Please login again.');
+          logout(); // Clear invalid session
+          navigate('/', { replace: true });
+        }
+      }
+    }
+  );
+
+  // Fetch supplier details
+  const { data: supplier } = useQuery(
+    ['supplier', currentSupplierId],
+    async () => {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}`);
+      return response.data;
+    },
+    { 
+      enabled: shouldEnableQueries && !!currentSupplierId,
+      onError: (error: any) => {
+        if (error.response?.status === 404) {
+          toast.error('Supplier not found. Please login again.');
+          logout(); // Clear invalid session
+          navigate('/', { replace: true });
+        }
+      }
+    }
+  );
+
+  // Fetch available orders for bidding
+  const { data: availableOrders } = useQuery(
+    ['availableOrders', currentSupplierId],
+    async () => {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}/available-orders`);
+      return response.data;
+    },
+    { enabled: shouldEnableQueries && !!currentSupplierId }
+  );
+
+  // Fetch supplier bids
+  const { data: supplierBids } = useQuery(
+    ['supplierBids', currentSupplierId],
+    async () => {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}/bids`);
+      return response.data;
+    },
+    { enabled: shouldEnableQueries && !!currentSupplierId }
+  );
 
   // Validate authentication and supplier access
   useEffect(() => {
@@ -57,80 +120,6 @@ const SupplierDashboard: React.FC = () => {
       return;
     }
   }, [isAuthenticated, authenticatedSupplierId, user, supplierId, navigate]);
-
-  // Show loading spinner while validating
-  if (!isAuthenticated || !authenticatedSupplierId || user?.type !== 'supplier') {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Use authenticated supplier ID for all operations
-  const currentSupplierId = authenticatedSupplierId;
-
-  // Fetch supplier dashboard data
-  const { data: dashboardData, isLoading, error } = useQuery(
-    ['supplierDashboard', currentSupplierId],
-    async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}/dashboard`);
-      return response.data;
-    },
-    {
-      enabled: !!currentSupplierId,
-      refetchInterval: 30000, // Refresh every 30 seconds
-      onError: (error: any) => {
-        if (error.response?.status === 404) {
-          toast.error('Supplier not found. Please login again.');
-          logout(); // Clear invalid session
-          navigate('/', { replace: true });
-        }
-      }
-    }
-  );
-
-  // Fetch supplier details
-  const { data: supplier } = useQuery(
-    ['supplier', currentSupplierId],
-    async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}`);
-      return response.data;
-    },
-    { 
-      enabled: !!currentSupplierId,
-      onError: (error: any) => {
-        if (error.response?.status === 404) {
-          toast.error('Supplier not found. Please login again.');
-          logout(); // Clear invalid session
-          navigate('/', { replace: true });
-        }
-      }
-    }
-  );
-
-  // Fetch available orders for bidding
-  const { data: availableOrders } = useQuery(
-    ['availableOrders', currentSupplierId],
-    async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}/available-orders`);
-      return response.data;
-    },
-    { enabled: !!currentSupplierId }
-  );
-
-  // Fetch supplier bids
-  const { data: supplierBids } = useQuery(
-    ['supplierBids', currentSupplierId],
-    async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}/bids`);
-      return response.data;
-    },
-    { enabled: !!currentSupplierId }
-  );
 
   // Create bid mutation
   const createBidMutation = useMutation(
@@ -170,6 +159,18 @@ const SupplierDashboard: React.FC = () => {
       }
     }
   );
+
+  // Show loading spinner while validating
+  if (!isAuthenticated || !authenticatedSupplierId || user?.type !== 'supplier') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
