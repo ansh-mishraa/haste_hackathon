@@ -14,7 +14,6 @@ const VendorRegistration: React.FC<VendorRegistrationProps> = ({ onClose, onSucc
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     phone: '',
-    password: '',
     name: '',
     businessType: '',
     businessLocation: '',
@@ -143,24 +142,6 @@ const VendorRegistration: React.FC<VendorRegistrationProps> = ({ onClose, onSucc
                 placeholder="9876543210"
               />
             </div>
-          </div>
-
-          {/* Password */}
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Password *
-            </label>
-            <input
-              type="password"
-              name="password"
-              id="password"
-              required
-              minLength={6}
-              value={formData.password}
-              onChange={handleChange}
-              className="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-              placeholder="Enter a password (min 6 characters)"
-            />
           </div>
 
           {/* Name */}

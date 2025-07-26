@@ -15,7 +15,6 @@ dotenv.config();
 const { connectDB, disconnectDB } = require('./config/database');
 
 // Import routes
-const authRoutes = require('./routes/auth');
 const vendorRoutes = require('./routes/vendors');
 const supplierRoutes = require('./routes/suppliers');
 const orderRoutes = require('./routes/orders');
@@ -102,7 +101,6 @@ app.get('/health', (req, res) => {
 });
 
 // API routes (no auth required - open website)
-app.use('/api/auth', authRoutes);
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/orders', orderRoutes);
