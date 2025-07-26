@@ -5,8 +5,6 @@ import { useAuth } from '../context/AuthContext.tsx';
 import { MagnifyingGlassIcon, FunnelIcon, ShoppingCartIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { useCart } from '../context/CartContext.tsx';
-
 
 // Custom hook for debouncing values
 const useDebounce = (value: string, delay: number) => {
@@ -31,8 +29,6 @@ const ProductCatalog: React.FC = () => {
   const { user, isAuthenticated, isLoading, getUserId } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-
-
   const [cart, setCart] = useState<any[]>([]);
   const [showCustomProductModal, setShowCustomProductModal] = useState(false);
   const [customProductForm, setCustomProductForm] = useState({
@@ -156,58 +152,52 @@ const ProductCatalog: React.FC = () => {
     }).format(amount);
   };
 
-  // const handleAddToOrder = (product: any) => {
-  //   const existingItem = cart.find(item => item.productId === product.id);
-  //   if (existingItem) {
-  //     setCart(items => 
-  //       items.map(item => 
-  //         item.productId === product.id 
-  //           ? { ...item, quantity: item.quantity + 1 }
-  //           : item
-  //       )
-  //     );
-  //   } else {
-  //     setCart(items => [...items, {
-  //       productId: product.id,
-  //       product,
-  //       quantity: 1,
-  //       unit: product.unit,
-  //       pricePerUnit: product.marketPrice
-  //     }]);
-  //   }
-  //   toast.success(`${product.name} added to cart`);
-  // };
-
-
   const handleAddToOrder = (product: any) => {
-  addItem(product, 1);
-  toast.success(`${product.name} added to cart`);
-};
+    const existingItem = cart.find(item => item.productId === product.id);
+    if (existingItem) {
+      setCart(items => 
+        items.map(item => 
+          item.productId === product.id 
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        )
+      );
+    } else {
+      setCart(items => [...items, {
+        productId: product.id,
+        product,
+        quantity: 1,
+        unit: product.unit,
+        pricePerUnit: product.marketPrice
+      }]);
+    }
+    toast.success(`${product.name} added to cart`);
+  };
 
-  // const removeFromCart = (productId: string) => {
-  //   setCart(items => items.filter(item => item.productId !== productId));
-  // };
+  const removeFromCart = (productId: string) => {
+    setCart(items => items.filter(item => item.productId !== productId));
+  };
 
-  // const updateQuantity = (productId: string, quantity: number) => {
-  //   if (quantity <= 0) {
-  //     removeFromCart(productId);
-  //     return;
-  //   }
-  //   setCart(items =>
-  //     items.map(item =>
-  //       item.productId === productId
-  //         ? { ...item, quantity }
-  //         : item
-  //     )
-  //   );
-  // };
+  const updateQuantity = (productId: string, quantity: number) => {
+    if (quantity <= 0) {
+      removeFromCart(productId);
+      return;
+    }
+    setCart(items =>
+      items.map(item =>
+        item.productId === productId
+          ? { ...item, quantity }
+          : item
+      )
+    );
+  };
 
   const getTotalAmount = () => {
     return cart.reduce((total, item) => total + (item.quantity * item.pricePerUnit), 0);
   };
 
   const handleCheckout = () => {
-    if (cart?.length === 0) {
+    if (cart.length === 0) {
       toast.error('Please add some products to your cart');
       return;
     }
@@ -250,7 +240,7 @@ const ProductCatalog: React.FC = () => {
   const commonUnits = ['kg', 'gram', 'liter', 'pieces', 'packet', 'bottle', 'bag'];
 
   // Show loading indicator when search is being typed but not yet debounced
-  const isSearching = searchTerm !== debouncedSearchTerm; 
+  const isSearching = searchTerm !== debouncedSearchTerm;
 
   if (isProductsLoading) {
     return (
@@ -406,7 +396,7 @@ const ProductCatalog: React.FC = () => {
         </div>
 
         {/* Empty State */}
-        {products?.length === 0 && (
+        {products && products.length === 0 && (
           <div className="text-center py-12">
             <div className="text-6xl mb-4">🔍</div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -436,7 +426,7 @@ const ProductCatalog: React.FC = () => {
         </div> */}
 
         {/* Floating Cart Button */}
-        {cart?.length > 0 && (
+        {cart.length > 0 && (
           <div className="fixed bottom-6 right-6 z-50">
             <button
               onClick={handleCheckout}
@@ -453,12 +443,12 @@ const ProductCatalog: React.FC = () => {
         )}
 
         {/* Cart Summary Modal - Show when cart has items */}
-        {cart?.length > 0 && (
+        {cart.length > 0 && (
           <div className="fixed bottom-24 right-6 z-40 bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm">
             <h3 className="font-medium text-gray-900 mb-3">Cart Summary</h3>
             <div className="space-y-2 max-h-40 overflow-y-auto">
               {cart.map((item) => (
-                <div key={item.product.id} className="flex items-center justify-between text-sm">
+                <div key={item.productId} className="flex items-center justify-between text-sm">
                   <div className="flex-1">
                     <span className="font-medium">{item.product.name}</span>
                     <div className="text-gray-500">
@@ -467,16 +457,14 @@ const ProductCatalog: React.FC = () => {
                   </div>
                   <div className="flex items-center space-x-1">
                     <button
-                      // onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                      onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-
+                      onClick={() => updateQuantity(item.productId, item.quantity - 1)}
                       className="text-gray-400 hover:text-gray-600 w-6 h-6 flex items-center justify-center"
                     >
                       -
                     </button>
                     <span className="w-8 text-center">{item.quantity}</span>
                     <button
-                      onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                      onClick={() => updateQuantity(item.productId, item.quantity + 1)}
                       className="text-gray-400 hover:text-gray-600 w-6 h-6 flex items-center justify-center"
                     >
                       +
