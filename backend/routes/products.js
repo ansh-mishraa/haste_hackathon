@@ -1,8 +1,6 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const { prisma } = require('../config/database');
 const router = express.Router();
-
-const prisma = new PrismaClient();
 
 // Get all products
 router.get('/', async (req, res) => {
@@ -43,6 +41,7 @@ router.get('/', async (req, res) => {
 
     res.json(products);
   } catch (error) {
+    console.error('Error fetching products:', error);
     res.status(500).json({ error: 'Failed to fetch products' });
   }
 });

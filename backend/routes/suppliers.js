@@ -1,9 +1,7 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const { prisma } = require('../config/database');
 const socketService = require('../services/socketService');
 const router = express.Router();
-
-const prisma = new PrismaClient();
 
 // Get all suppliers
 router.get('/', async (req, res) => {

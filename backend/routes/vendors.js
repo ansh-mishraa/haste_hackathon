@@ -1,8 +1,6 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const { prisma } = require('../config/database');
 const router = express.Router();
-
-const prisma = new PrismaClient();
 
 // Get all vendors
 router.get('/', async (req, res) => {
@@ -23,6 +21,7 @@ router.get('/', async (req, res) => {
     });
     res.json(vendors);
   } catch (error) {
+    console.error('Error fetching vendors:', error);
     res.status(500).json({ error: 'Failed to fetch vendors' });
   }
 });
@@ -42,28 +41,51 @@ router.post('/', async (req, res) => {
       upiId
     } = req.body;
 
+    // Validate required fields
+    if (!phone || !name || !businessType || !businessLocation) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: phone, name, businessType, businessLocation' 
+      });
+    }
+
+    // Check if vendor with this phone already exists
+    const existingVendor = await prisma.vendor.findUnique({
+      where: { phone }
+    });
+
+    if (existingVendor) {
+      return res.status(409).json({ 
+        error: 'Vendor with this phone number already exists' 
+      });
+    }
+
     const vendor = await prisma.vendor.create({
       data: {
         phone,
         name,
         businessType,
         businessLocation,
-        latitude,
-        longitude,
-        estimatedDailyPurchase,
-        bankAccount,
-        upiId,
-        isVerified: true, // Auto-verify for open website
-        phoneVerifiedAt: new Date(),
-        locationVerifiedAt: new Date()
+        latitude: latitude ? parseFloat(latitude) : null,
+        longitude: longitude ? parseFloat(longitude) : null,
+        estimatedDailyPurchase: estimatedDailyPurchase ? parseFloat(estimatedDailyPurchase) : 1000,
+        bankAccount: bankAccount || null,
+        upiId: upiId || null
       }
     });
 
-    res.status(201).json(vendor);
+    res.status(201).json({
+      message: 'Vendor created successfully',
+      vendor: {
+        id: vendor.id,
+        name: vendor.name,
+        businessType: vendor.businessType,
+        businessLocation: vendor.businessLocation,
+        trustScore: vendor.trustScore,
+        availableCredit: vendor.availableCredit
+      }
+    });
   } catch (error) {
-    if (error.code === 'P2002') {
-      return res.status(400).json({ error: 'Phone number already registered' });
-    }
+    console.error('Error creating vendor:', error);
     res.status(500).json({ error: 'Failed to create vendor' });
   }
 });

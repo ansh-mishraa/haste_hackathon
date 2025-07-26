@@ -1,19 +1,26 @@
 # Dependencies
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Production
+/build
 
 # Environment variables
 .env
 .env.local
-.env.development
-.env.test
-.env.production
+.env.development.local
+.env.test.local
+.env.production.local
 
 # Logs
-logs
-*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
 
 # Runtime data
 pids
@@ -28,28 +35,7 @@ coverage/
 # nyc test coverage
 .nyc_output
 
-# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
-.grunt
-
-# Bower dependency directory (https://bower.io/)
-bower_components
-
-# node-waf configuration
-.lock-wscript
-
-# Compiled binary addons (https://nodejs.org/api/addons.html)
-build/Release
-
-# Dependency directories
-jspm_packages/
-
-# TypeScript v1 declaration files
-typings/
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
+# ESLint cache
 .eslintcache
 
 # Microbundle cache
@@ -57,6 +43,12 @@ typings/
 .rts2_cache_cjs/
 .rts2_cache_es/
 .rts2_cache_umd/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
 
 # Optional REPL history
 .node_repl_history
@@ -77,10 +69,6 @@ typings/
 # Nuxt.js build / generate output
 .nuxt
 dist
-
-# Gatsby files
-.cache/
-public
 
 # Storybook build outputs
 .out
@@ -105,15 +93,3 @@ temp/
 .Trashes
 ehthumbs.db
 Thumbs.db
-
-# Database files
-*.db
-*.sqlite
-*.sqlite3
-
-# Prisma generated files
-/prisma/migrations/dev.db*
-
-# Upload directories
-uploads/
-public/uploads/

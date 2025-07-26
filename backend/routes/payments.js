@@ -1,8 +1,6 @@
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const { prisma } = require('../config/database');
 const router = express.Router();
-
-const prisma = new PrismaClient();
 
 // Get all payments
 router.get('/', async (req, res) => {
