@@ -288,11 +288,9 @@ enum OrderStatus {
 }
 
 enum PaymentMethod {
-  PAY_NOW
+  CASH
   PAY_LATER
   UPI
-  CARD
-  BANK_TRANSFER
 }
 
 enum PaymentStatus {

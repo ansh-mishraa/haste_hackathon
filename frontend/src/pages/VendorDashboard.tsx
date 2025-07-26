@@ -158,7 +158,10 @@ const GroupFinderModal: React.FC<{
   onClose: () => void;
   onJoinGroup: (groupId: string) => void;
 }> = ({ vendorId, onClose, onJoinGroup }) => {
+  const navigate = useNavigate();
   const [selectedLocation, setSelectedLocation] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [showAllGroups, setShowAllGroups] = useState(true);
   
   // Fetch available locations
   const { data: availableLocations } = useQuery(
@@ -170,11 +173,32 @@ const GroupFinderModal: React.FC<{
   );
   
   const { data: availableGroups, isLoading } = useQuery(
-    ['groupSuggestions', vendorId, selectedLocation],
+    ['allGroups', vendorId, selectedLocation, selectedStatus, showAllGroups],
     async () => {
-      const params = selectedLocation ? `?location=${encodeURIComponent(selectedLocation)}` : '';
-      const response = await axios.get(`${API_URL}/api/groups/suggestions/${vendorId}${params}`);
-      return response.data;
+      if (showAllGroups) {
+        // Fetch all groups with optional filters
+        const params = new URLSearchParams();
+        if (selectedLocation) {
+          params.append('location', selectedLocation);
+        }
+        if (selectedStatus) {
+          params.append('status', selectedStatus);
+        }
+        const response = await axios.get(`${API_URL}/api/groups?${params.toString()}`);
+        
+        // Add membership status for each group
+        const groupsWithMembershipStatus = response.data.map((group: any) => ({
+          ...group,
+          isCurrentUserMember: group.memberships?.some((m: any) => m.vendorId === vendorId) || false
+        }));
+        
+        return groupsWithMembershipStatus;
+      } else {
+        // Use the suggestions endpoint for joinable groups only
+        const params = selectedLocation ? `?location=${encodeURIComponent(selectedLocation)}` : '';
+        const response = await axios.get(`${API_URL}/api/groups/suggestions/${vendorId}${params}`);
+        return response.data.map((group: any) => ({ ...group, isCurrentUserMember: false }));
+      }
     }
   );
 
@@ -187,81 +211,192 @@ const GroupFinderModal: React.FC<{
     });
   };
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
       <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white max-h-[80vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium text-gray-900">Find Groups to Join</h3>
+          <h3 className="text-lg font-medium text-gray-900">Find Groups</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
 
+        {/* Group Type Toggle */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Location</label>
-          <select
-            value={selectedLocation}
-            onChange={(e) => setSelectedLocation(e.target.value)}
-            className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="">All Locations (Show groups from my area)</option>
-            {availableLocations?.map((location: string) => (
-              <option key={location} value={location}>
-                {location}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-gray-500 mt-1">
-            Groups will be filtered by pickup location. Leave empty to show groups from your business area.
-          </p>
+          <div className="flex items-center space-x-4 mb-4">
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="groupType"
+                checked={showAllGroups}
+                onChange={() => setShowAllGroups(true)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+              />
+              <span className="ml-2 text-sm font-medium text-gray-700">Show All Groups</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="groupType"
+                checked={!showAllGroups}
+                onChange={() => setShowAllGroups(false)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+              />
+              <span className="ml-2 text-sm font-medium text-gray-700">Joinable Groups Only</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Location</label>
+            <select
+              value={selectedLocation}
+              onChange={(e) => setSelectedLocation(e.target.value)}
+              className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">All Locations</option>
+              {availableLocations?.map((location: string) => (
+                <option key={location} value={location}>
+                  {location}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Status</label>
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">All Statuses</option>
+              <option value="FORMING">Forming</option>
+              <option value="CONFIRMED">Confirmed</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+          </div>
         </div>
 
         {isLoading ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-gray-500 mt-2">Finding groups...</p>
+            <p className="text-gray-500 mt-2">Loading groups...</p>
           </div>
         ) : availableGroups && availableGroups.length > 0 ? (
           <div className="space-y-4">
-            {availableGroups.map((group: any) => (
-              <div key={group.id} className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h4 className="font-medium text-gray-900">{group.name || `Group ${group.id.slice(0, 8)}`}</h4>
-                    <p className="text-sm text-gray-600 flex items-center">
-                      <MapPinIcon className="h-4 w-4 mr-1" />
-                      {group.pickupLocation}
-                    </p>
-                    <p className="text-sm text-gray-600 flex items-center">
-                      <ClockIcon className="h-4 w-4 mr-1" />
-                      {formatDate(group.targetPickupTime)}
-                    </p>
-                  </div>
-                  <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
-                    {group.status}
-                  </span>
-                </div>
+            {availableGroups.map((group: any) => {
+              const getStatusColor = (status: string) => {
+                switch (status) {
+                  case 'FORMING': return 'bg-yellow-100 text-yellow-800';
+                  case 'CONFIRMED': return 'bg-blue-100 text-blue-800';
+                  case 'COMPLETED': return 'bg-green-100 text-green-800';
+                  case 'CANCELLED': return 'bg-red-100 text-red-800';
+                  default: return 'bg-gray-100 text-gray-800';
+                }
+              };
 
-                <div className="flex justify-between items-center">
-                  <div className="text-sm text-gray-600">
-                    {group.memberships?.length || 0} / {group.maxMembers} members
+              const canJoin = group.status === 'FORMING' && 
+                             !group.isCurrentUserMember && 
+                             (group.memberships?.length || 0) < group.maxMembers;
+
+              const buttonAction = () => {
+                if (group.isCurrentUserMember) {
+                  // Navigate to group details if already a member
+                  onClose();
+                  navigate(`/group/${group.id}`);
+                } else if (canJoin) {
+                  onJoinGroup(group.id);
+                } else {
+                  // Just navigate to view the group
+                  onClose();
+                  navigate(`/group/${group.id}`);
+                }
+              };
+
+              const getButtonText = () => {
+                if (group.isCurrentUserMember) return 'View Group';
+                if (canJoin) return 'Join Group';
+                if (group.status === 'FORMING' && (group.memberships?.length || 0) >= group.maxMembers) return 'Group Full';
+                return 'View Details';
+              };
+
+              const getButtonClass = () => {
+                if (group.isCurrentUserMember) return 'bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm';
+                if (canJoin) return 'bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm';
+                if (group.status === 'FORMING' && (group.memberships?.length || 0) >= group.maxMembers) {
+                  return 'bg-gray-400 text-white px-4 py-2 rounded-md cursor-not-allowed text-sm';
+                }
+                return 'bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 text-sm';
+              };
+
+              return (
+                <div key={group.id} className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <div className="flex items-center space-x-2 mb-1">
+                        <h4 className="font-medium text-gray-900">{group.name || `Group ${group.id.slice(0, 8)}`}</h4>
+                        {group.isCurrentUserMember && (
+                          <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                            Member
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600 flex items-center">
+                        <MapPinIcon className="h-4 w-4 mr-1" />
+                        {group.pickupLocation}
+                      </p>
+                      <p className="text-sm text-gray-600 flex items-center">
+                        <ClockIcon className="h-4 w-4 mr-1" />
+                        {formatDate(group.targetPickupTime)}
+                      </p>
+                    </div>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(group.status)}`}>
+                      {group.status}
+                    </span>
                   </div>
-                  <button
-                    onClick={() => onJoinGroup(group.id)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm"
-                  >
-                    Join Group
-                  </button>
+
+                  <div className="flex justify-between items-center">
+                    <div className="text-sm text-gray-600">
+                      {group.memberships?.length || 0} / {group.maxMembers} members
+                      {group.totalValue && (
+                        <span className="ml-3 text-green-600 font-medium">
+                          Total: {formatCurrency(group.totalValue)}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={buttonAction}
+                      disabled={group.status === 'FORMING' && (group.memberships?.length || 0) >= group.maxMembers && !group.isCurrentUserMember}
+                      className={getButtonClass()}
+                    >
+                      {getButtonText()}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-8">
             <UserGroupIcon className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-4 text-lg font-medium text-gray-900">No groups found</h3>
             <p className="mt-2 text-sm text-gray-500">
-              No groups are currently forming in the selected location. Try selecting a different location or create your own group.
+              {showAllGroups 
+                ? "No groups match your current filters. Try adjusting the location or status filters."
+                : "No groups are currently available to join. Try showing all groups or create your own group."
+              }
             </p>
           </div>
         )}
