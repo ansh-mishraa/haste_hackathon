@@ -213,6 +213,54 @@ router.put('/:id/status', async (req, res) => {
   }
 });
 
+// Complete payment for an order (UPI/Online payments)
+router.post('/complete/:orderId', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { upiTransactionId, paymentMethod = 'UPI' } = req.body;
+
+    // Find the pending payment for this order
+    const payment = await prisma.payment.findFirst({
+      where: {
+        orderId: orderId,
+        status: 'PENDING'
+      },
+      include: {
+        order: true
+      }
+    });
+
+    if (!payment) {
+      return res.status(404).json({ error: 'No pending payment found for this order' });
+    }
+
+    // Update payment status to completed
+    const updatedPayment = await prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        status: 'COMPLETED',
+        paidAt: new Date(),
+        razorpayPaymentId: upiTransactionId || `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        description: `Payment completed via ${paymentMethod} for Order #${orderId.substring(0, 8)}`
+      }
+    });
+
+    // Update order payment status
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { paymentStatus: 'COMPLETED' }
+    });
+
+    res.json({
+      ...updatedPayment,
+      message: 'Payment completed successfully'
+    });
+  } catch (error) {
+    console.error('Payment completion error:', error);
+    res.status(500).json({ error: 'Failed to complete payment' });
+  }
+});
+
 // Get vendor's payment history
 router.get('/vendor/:vendorId/history', async (req, res) => {
   try {
@@ -566,6 +614,87 @@ router.get('/analytics/:vendorId', async (req, res) => {
   } catch (error) {
     console.error('Payment analytics error:', error);
     res.status(500).json({ error: 'Failed to fetch payment analytics' });
+  }
+});
+
+// TESTING UTILITY - Create sample transactions for a vendor
+router.post('/test/create-sample/:vendorId', async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+
+    // Check if vendor exists
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId }
+    });
+
+    if (!vendor) {
+      return res.status(404).json({ error: 'Vendor not found' });
+    }
+
+    // Create sample transactions
+    const samplePayments = [
+      {
+        vendorId: vendorId,
+        amount: 250.00,
+        type: 'ORDER_PAYMENT',
+        method: 'UPI',
+        status: 'COMPLETED',
+        paidAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
+        description: 'Payment for vegetables order - UPI',
+        razorpayPaymentId: `pay_test_${Date.now()}_1`
+      },
+      {
+        vendorId: vendorId,
+        amount: 450.00,
+        type: 'CREDIT_PURCHASE',
+        method: 'PAY_LATER',
+        status: 'PENDING',
+        description: 'Credit purchase - Spices and oil order'
+      },
+      {
+        vendorId: vendorId,
+        amount: 180.00,
+        type: 'ORDER_PAYMENT',
+        method: 'CASH',
+        status: 'COMPLETED',
+        paidAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+        description: 'Cash payment for bread and dairy'
+      },
+      {
+        vendorId: vendorId,
+        amount: 320.00,
+        type: 'ORDER_PAYMENT',
+        method: 'UPI',
+        status: 'PENDING',
+        description: 'Pending payment for meat order'
+      }
+    ];
+
+    const createdPayments = await Promise.all(
+      samplePayments.map(payment => 
+        prisma.payment.create({ data: payment })
+      )
+    );
+
+    // Also create a sample credit transaction
+    await prisma.creditTransaction.create({
+      data: {
+        vendorId: vendorId,
+        amount: 450.00,
+        type: 'CREDIT_USED',
+        description: 'Sample credit transaction',
+        status: 'DUE',
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // Due in 7 days
+      }
+    });
+
+    res.json({
+      message: `Created ${createdPayments.length} sample payments for vendor`,
+      payments: createdPayments
+    });
+  } catch (error) {
+    console.error('Error creating sample payments:', error);
+    res.status(500).json({ error: 'Failed to create sample payments' });
   }
 });
 

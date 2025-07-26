@@ -69,20 +69,24 @@ router.post('/', async (req, res) => {
       longitude
     } = req.body;
 
+    // Convert latitude/longitude to proper types
+    const processedLatitude = latitude && latitude !== '' ? parseFloat(latitude) : null;
+    const processedLongitude = longitude && longitude !== '' ? parseFloat(longitude) : null;
+
     const supplier = await prisma.supplier.create({
       data: {
         phone,
         businessName,
-        businessRegNumber,
-        gstNumber,
+        businessRegNumber: businessRegNumber || null,
+        gstNumber: gstNumber || null,
         contactPerson,
-        email,
+        email: email || null,
         deliveryAreas,
         productCategories,
         bankAccount,
         businessAddress,
-        latitude,
-        longitude,
+        latitude: processedLatitude,
+        longitude: processedLongitude,
         isVerified: true // Auto-verify for open website
       }
     });
@@ -213,7 +217,26 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const supplierId = req.params.id;
-    const updates = req.body;
+    const updates = { ...req.body };
+
+    // Process latitude/longitude if they exist in updates
+    if ('latitude' in updates) {
+      updates.latitude = updates.latitude && updates.latitude !== '' ? parseFloat(updates.latitude) : null;
+    }
+    if ('longitude' in updates) {
+      updates.longitude = updates.longitude && updates.longitude !== '' ? parseFloat(updates.longitude) : null;
+    }
+
+    // Process other optional fields
+    if ('businessRegNumber' in updates && !updates.businessRegNumber) {
+      updates.businessRegNumber = null;
+    }
+    if ('gstNumber' in updates && !updates.gstNumber) {
+      updates.gstNumber = null;
+    }
+    if ('email' in updates && !updates.email) {
+      updates.email = null;
+    }
 
     const supplier = await prisma.supplier.update({
       where: { id: supplierId },

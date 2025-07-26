@@ -195,7 +195,26 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const vendorId = req.params.id;
-    const updates = req.body;
+    const updates = { ...req.body };
+
+    // Process latitude/longitude if they exist in updates
+    if ('latitude' in updates) {
+      updates.latitude = updates.latitude && updates.latitude !== '' ? parseFloat(updates.latitude) : null;
+    }
+    if ('longitude' in updates) {
+      updates.longitude = updates.longitude && updates.longitude !== '' ? parseFloat(updates.longitude) : null;
+    }
+
+    // Process other optional fields
+    if ('estimatedDailyPurchase' in updates && updates.estimatedDailyPurchase) {
+      updates.estimatedDailyPurchase = parseFloat(updates.estimatedDailyPurchase);
+    }
+    if ('bankAccount' in updates && !updates.bankAccount) {
+      updates.bankAccount = null;
+    }
+    if ('upiId' in updates && !updates.upiId) {
+      updates.upiId = null;
+    }
 
     const vendor = await prisma.vendor.update({
       where: { id: vendorId },

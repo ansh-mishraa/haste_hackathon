@@ -133,7 +133,35 @@ router.post('/', async (req, res) => {
       }
     });
 
-    // If it's a pay-later order, create credit transaction
+    // Create payment record for all orders
+    let paymentStatus = 'PENDING';
+    let paymentType = 'ORDER_PAYMENT';
+
+    if (paymentMethod === 'PAY_LATER') {
+      paymentStatus = 'PENDING';
+      paymentType = 'CREDIT_PURCHASE';
+    } else if (paymentMethod === 'PAY_NOW' || paymentMethod === 'UPI') {
+      paymentStatus = 'PENDING';
+      paymentType = 'ORDER_PAYMENT';
+    } else if (paymentMethod === 'CASH') {
+      paymentStatus = 'PENDING';
+      paymentType = 'ORDER_PAYMENT';
+    }
+
+    // Create payment record
+    await prisma.payment.create({
+      data: {
+        vendorId,
+        orderId: order.id,
+        amount: totalAmount,
+        type: paymentType,
+        method: paymentMethod,
+        status: paymentStatus,
+        description: `Payment for Order #${order.id.substring(0, 8)}`
+      }
+    });
+
+    // If it's a pay-later order, also create credit transaction
     if (paymentMethod === 'PAY_LATER') {
       await prisma.creditTransaction.create({
         data: {
@@ -288,7 +316,7 @@ router.put('/:id/status', async (req, res) => {
       });
     }
 
-    // If order is delivered, update trust score and savings
+    // If order is delivered, update trust score, savings, and complete payments
     if (status === 'DELIVERED') {
       const vendor = await prisma.vendor.findUnique({
         where: { id: order.vendorId }
@@ -309,6 +337,36 @@ router.put('/:id/status', async (req, res) => {
             }
           }
         });
+
+        // Mark payment as completed for cash payments
+        if (order.paymentMethod === 'CASH') {
+          await prisma.payment.updateMany({
+            where: { 
+              orderId: orderId,
+              status: 'PENDING'
+            },
+            data: {
+              status: 'COMPLETED',
+              paidAt: new Date(),
+              description: `Payment completed for delivered Order #${orderId.substring(0, 8)}`
+            }
+          });
+        }
+
+        // For pay-later orders, mark the credit transaction as due
+        if (order.paymentMethod === 'PAY_LATER') {
+          await prisma.creditTransaction.updateMany({
+            where: { 
+              orderId: orderId,
+              type: 'CREDIT_USED',
+              status: 'PENDING'
+            },
+            data: {
+              status: 'DUE',
+              description: `Order #${orderId.substring(0, 8)} delivered - Payment due`
+            }
+          });
+        }
       }
     }
 

@@ -39,7 +39,7 @@ router.put('/:bidId/accept', async (req, res) => {
     });
 
     // Update order with supplier and status
-    await prisma.order.update({
+    const updatedOrder = await prisma.order.update({
       where: { id: bid.orderId },
       data: {
         supplierId: bid.supplierId,
@@ -47,6 +47,67 @@ router.put('/:bidId/accept', async (req, res) => {
         totalAmount: bid.totalAmount
       }
     });
+
+    // Update payment record with final amount and status
+    await prisma.payment.updateMany({
+      where: { 
+        orderId: bid.orderId,
+        status: 'PENDING'
+      },
+      data: {
+        amount: bid.totalAmount,
+        status: updatedOrder.paymentMethod === 'CASH' ? 'PENDING' : 'PENDING',
+        description: `Payment for Order #${bid.orderId.substring(0, 8)} - Bid accepted from ${bid.supplier.businessName}`
+      }
+    });
+
+    // If no payment record exists (edge case), create one
+    const existingPayment = await prisma.payment.findFirst({
+      where: { orderId: bid.orderId }
+    });
+
+    if (!existingPayment) {
+      await prisma.payment.create({
+        data: {
+          vendorId: bid.order.vendorId,
+          orderId: bid.orderId,
+          amount: bid.totalAmount,
+          type: updatedOrder.paymentMethod === 'PAY_LATER' ? 'CREDIT_PURCHASE' : 'ORDER_PAYMENT',
+          method: updatedOrder.paymentMethod,
+          status: 'PENDING',
+          description: `Payment for Order #${bid.orderId.substring(0, 8)} - Bid accepted`
+        }
+      });
+    }
+
+    // Update credit transaction if it's a pay-later order
+    if (updatedOrder.paymentMethod === 'PAY_LATER') {
+      await prisma.creditTransaction.updateMany({
+        where: { 
+          orderId: bid.orderId,
+          type: 'CREDIT_USED'
+        },
+        data: {
+          amount: bid.totalAmount,
+          description: `Order #${bid.orderId.substring(0, 8)} - Final amount after bid acceptance`
+        }
+      });
+
+      // Update vendor's credit balance if the amount changed
+      const originalAmount = bid.order.totalAmount;
+      const amountDifference = bid.totalAmount - originalAmount;
+      
+      if (amountDifference !== 0) {
+        await prisma.vendor.update({
+          where: { id: bid.order.vendorId },
+          data: {
+            usedCredit: {
+              increment: amountDifference
+            }
+          }
+        });
+      }
+    }
 
     // Reject all other bids for this order
     await prisma.bid.updateMany({
