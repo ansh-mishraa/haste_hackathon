@@ -51,11 +51,17 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     socketInstance.on('new_group_formed', (data) => {
-      toast.info(`New group formed near ${data.pickupLocation}`);
+      toast(`New group formed near ${data.pickupLocation}`, {
+        icon: '👥',
+        duration: 4000,
+      });
     });
 
     socketInstance.on('group_ready_for_bids', (data) => {
-      toast.info(`Group order ready for bids - Total: ₹${data.totalValue}`);
+      toast(`Group order ready for bids - Total: ₹${data.totalValue}`, {
+        icon: '💰',
+        duration: 4000,
+      });
     });
 
     socketInstance.on('bid_accepted', (data) => {
@@ -63,7 +69,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     socketInstance.on('new_bid_received', (data) => {
-      toast.info(`New bid received from ${data.supplierName}`);
+      toast(`New bid received from ${data.supplierName}`, {
+        icon: '📝',
+        duration: 4000,
+      });
     });
 
     setSocket(socketInstance);

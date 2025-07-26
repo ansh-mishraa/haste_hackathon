@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useAuth } from '../context/AuthContext.tsx';
 import {
   ChartBarIcon,
   CurrencyRupeeIcon,
@@ -21,50 +22,114 @@ const SupplierDashboard: React.FC = () => {
   const { id: supplierId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user, isAuthenticated, getUserId, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [bidModal, setBidModal] = useState<{ isOpen: boolean; order: any }>({ isOpen: false, order: null });
 
+  // Get authenticated user's supplier ID
+  const authenticatedSupplierId = getUserId();
+
+  // Validate authentication and supplier access
+  useEffect(() => {
+    if (!isAuthenticated || !authenticatedSupplierId) {
+      toast.error('Please login to access your dashboard.');
+      navigate('/', { replace: true });
+      return;
+    }
+
+    // Check if user is a supplier
+    if (user?.type !== 'supplier') {
+      toast.error('Access denied. Supplier account required.');
+      navigate('/', { replace: true });
+      return;
+    }
+
+    // Check if URL supplierId matches authenticated user's ID
+    if (supplierId && supplierId !== authenticatedSupplierId) {
+      toast.error('Access denied. You can only access your own dashboard.');
+      navigate(`/supplier/${authenticatedSupplierId}/dashboard`, { replace: true });
+      return;
+    }
+
+    // If no supplierId in URL, redirect to correct URL
+    if (!supplierId) {
+      navigate(`/supplier/${authenticatedSupplierId}/dashboard`, { replace: true });
+      return;
+    }
+  }, [isAuthenticated, authenticatedSupplierId, user, supplierId, navigate]);
+
+  // Show loading spinner while validating
+  if (!isAuthenticated || !authenticatedSupplierId || user?.type !== 'supplier') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Use authenticated supplier ID for all operations
+  const currentSupplierId = authenticatedSupplierId;
+
   // Fetch supplier dashboard data
-  const { data: dashboardData, isLoading } = useQuery(
-    ['supplierDashboard', supplierId],
+  const { data: dashboardData, isLoading, error } = useQuery(
+    ['supplierDashboard', currentSupplierId],
     async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${supplierId}/dashboard`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}/dashboard`);
       return response.data;
     },
     {
-      enabled: !!supplierId,
-      refetchInterval: 30000
+      enabled: !!currentSupplierId,
+      refetchInterval: 30000, // Refresh every 30 seconds
+      onError: (error: any) => {
+        if (error.response?.status === 404) {
+          toast.error('Supplier not found. Please login again.');
+          logout(); // Clear invalid session
+          navigate('/', { replace: true });
+        }
+      }
     }
   );
 
   // Fetch supplier details
   const { data: supplier } = useQuery(
-    ['supplier', supplierId],
+    ['supplier', currentSupplierId],
     async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${supplierId}`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}`);
       return response.data;
     },
-    { enabled: !!supplierId }
+    { 
+      enabled: !!currentSupplierId,
+      onError: (error: any) => {
+        if (error.response?.status === 404) {
+          toast.error('Supplier not found. Please login again.');
+          logout(); // Clear invalid session
+          navigate('/', { replace: true });
+        }
+      }
+    }
   );
 
   // Fetch available orders for bidding
   const { data: availableOrders } = useQuery(
-    ['availableOrders', supplierId],
+    ['availableOrders', currentSupplierId],
     async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${supplierId}/available-orders`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}/available-orders`);
       return response.data;
     },
-    { enabled: !!supplierId }
+    { enabled: !!currentSupplierId }
   );
 
   // Fetch supplier bids
   const { data: supplierBids } = useQuery(
-    ['supplierBids', supplierId],
+    ['supplierBids', currentSupplierId],
     async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${supplierId}/bids`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}/bids`);
       return response.data;
     },
-    { enabled: !!supplierId }
+    { enabled: !!currentSupplierId }
   );
 
   // Create bid mutation
@@ -76,8 +141,8 @@ const SupplierDashboard: React.FC = () => {
     {
       onSuccess: () => {
         toast.success('Bid submitted successfully!');
-        queryClient.invalidateQueries(['availableOrders', supplierId]);
-        queryClient.invalidateQueries(['supplierBids', supplierId]);
+        queryClient.invalidateQueries(['availableOrders', currentSupplierId]);
+        queryClient.invalidateQueries(['supplierBids', currentSupplierId]);
         setBidModal({ isOpen: false, order: null });
       },
       onError: (error: any) => {
@@ -91,14 +156,14 @@ const SupplierDashboard: React.FC = () => {
     async ({ orderId, status }: { orderId: string; status: string }) => {
       const response = await axios.put(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/orders/${orderId}/status`, {
         status,
-        supplierId
+        supplierId: currentSupplierId
       });
       return response.data;
     },
     {
       onSuccess: () => {
         toast.success('Order status updated successfully!');
-        queryClient.invalidateQueries(['supplierDashboard', supplierId]);
+        queryClient.invalidateQueries(['supplierDashboard', currentSupplierId]);
       },
       onError: (error: any) => {
         toast.error(error.response?.data?.error || 'Failed to update order status');
@@ -130,7 +195,7 @@ const SupplierDashboard: React.FC = () => {
     
     const bidData = {
       orderId: bidModal.order.id,
-      supplierId,
+      supplierId: currentSupplierId,
       totalAmount: parseFloat(formData.get('totalAmount') as string),
       message: formData.get('message') as string,
       deliveryTime: formData.get('deliveryTime') as string,
@@ -139,6 +204,23 @@ const SupplierDashboard: React.FC = () => {
 
     createBidMutation.mutate(bidData);
   };
+
+  // Show error if supplier not found
+  if (error && (error as any).response?.status === 404) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Supplier not found</p>
+          <button
+            onClick={() => navigate('/')}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+          >
+            Go to Homepage
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

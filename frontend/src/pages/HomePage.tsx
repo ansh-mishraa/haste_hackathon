@@ -6,15 +6,24 @@ import {
   CurrencyRupeeIcon,
   UsersIcon,
   TruckIcon,
-  ClockIcon
+  ClockIcon,
+  ArrowRightIcon
 } from '@heroicons/react/24/outline';
+import axios from 'axios';
+import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext.tsx';
 import VendorRegistration from '../components/VendorRegistration.tsx';
 import SupplierRegistration from '../components/SupplierRegistration.tsx';
 
 const HomePage: React.FC = () => {
   const [showVendorForm, setShowVendorForm] = useState(false);
   const [showSupplierForm, setShowSupplierForm] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const [loginType, setLoginType] = useState<'vendor' | 'supplier'>('vendor');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const features = [
     {
@@ -46,6 +55,101 @@ const HomePage: React.FC = () => {
     { label: 'Verified Suppliers', value: '150+' }
   ];
 
+  const handleVendorLogin = async () => {
+    if (!phoneNumber.trim()) {
+      toast.error('Please enter your mobile number');
+      return;
+    }
+
+    if (phoneNumber.length !== 10) {
+      toast.error('Please enter a valid 10-digit mobile number');
+      return;
+    }
+
+    setIsLoggingIn(true);
+    try {
+      const vendorResponse = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/vendors/by-phone/${phoneNumber}`);
+      if (vendorResponse.data) {
+        const vendorData = {
+          id: vendorResponse.data.id,
+          type: 'vendor' as const,
+          name: vendorResponse.data.name,
+          phone: vendorResponse.data.phone,
+          businessType: vendorResponse.data.businessType,
+          businessLocation: vendorResponse.data.businessLocation,
+          trustScore: vendorResponse.data.trustScore,
+          isVerified: vendorResponse.data.isVerified
+        };
+        
+        // Store user data in context and localStorage
+        login(vendorData);
+        
+        toast.success(`Welcome back, ${vendorData.name}! Redirecting to your dashboard...`);
+        navigate(`/vendor/${vendorData.id}/dashboard`);
+        return;
+      }
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        toast.error('No vendor account found with this mobile number. Please register as a vendor first.');
+      } else {
+        toast.error('Failed to login. Please try again.');
+      }
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleSupplierLogin = async () => {
+    if (!phoneNumber.trim()) {
+      toast.error('Please enter your mobile number');
+      return;
+    }
+
+    if (phoneNumber.length !== 10) {
+      toast.error('Please enter a valid 10-digit mobile number');
+      return;
+    }
+
+    setIsLoggingIn(true);
+    try {
+      const supplierResponse = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/by-phone/${phoneNumber}`);
+      if (supplierResponse.data) {
+        const supplierData = {
+          id: supplierResponse.data.id,
+          type: 'supplier' as const,
+          name: supplierResponse.data.contactPerson,
+          phone: supplierResponse.data.phone,
+          businessName: supplierResponse.data.businessName,
+          contactPerson: supplierResponse.data.contactPerson,
+          isVerified: supplierResponse.data.isVerified
+        };
+        
+        // Store user data in context and localStorage
+        login(supplierData);
+        
+        toast.success(`Welcome back, ${supplierData.name}! Redirecting to your dashboard...`);
+        navigate(`/supplier/${supplierData.id}/dashboard`);
+        return;
+      }
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        toast.error('No supplier account found with this mobile number. Please register as a supplier first.');
+      } else {
+        toast.error('Failed to login. Please try again.');
+      }
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleLoginSubmit = () => {
+    if (loginType === 'vendor') {
+      handleVendorLogin();
+    } else {
+      handleSupplierLogin();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-orange-50">
       {/* Hero Section */}
@@ -63,25 +167,120 @@ const HomePage: React.FC = () => {
                   and access smart credit solutions. VendorCircle makes group buying simple and profitable.
                 </p>
                 
+                {/* Login Section */}
+                {!showLogin ? (
+                  <div className="mt-5 sm:mt-8">
+                    <div className="bg-white p-4 rounded-lg shadow-md max-w-md mx-auto lg:mx-0">
+                      <h3 className="text-lg font-medium text-gray-900 mb-3">Already have an account?</h3>
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => {
+                            setLoginType('vendor');
+                            setShowLogin(true);
+                          }}
+                          className="w-full flex items-center justify-center px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors"
+                        >
+                          <UserIcon className="w-4 h-4 mr-2" />
+                          Login as Vendor
+                        </button>
+                        <button
+                          onClick={() => {
+                            setLoginType('supplier');
+                            setShowLogin(true);
+                          }}
+                          className="w-full flex items-center justify-center px-4 py-2 border border-green-600 text-green-600 rounded-md hover:bg-green-50 transition-colors"
+                        >
+                          <BuildingStorefrontIcon className="w-4 h-4 mr-2" />
+                          Login as Supplier
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-5 sm:mt-8">
+                    <div className="bg-white p-4 rounded-lg shadow-md max-w-md mx-auto lg:mx-0">
+                      <h3 className="text-lg font-medium text-gray-900 mb-3">
+                        Login as {loginType === 'vendor' ? 'Vendor' : 'Supplier'}
+                      </h3>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Mobile Number
+                          </label>
+                          <input
+                            type="tel"
+                            value={phoneNumber}
+                            onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                            placeholder="Enter 10-digit mobile number"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            maxLength={10}
+                          />
+                        </div>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={handleLoginSubmit}
+                            disabled={isLoggingIn}
+                            className={`flex-1 py-2 px-4 rounded-md text-white disabled:opacity-50 flex items-center justify-center ${
+                              loginType === 'vendor' 
+                                ? 'bg-blue-600 hover:bg-blue-700' 
+                                : 'bg-green-600 hover:bg-green-700'
+                            }`}
+                          >
+                            {isLoggingIn ? (
+                              'Logging in...'
+                            ) : (
+                              <>
+                                Login
+                                <ArrowRightIcon className="w-4 h-4 ml-2" />
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowLogin(false);
+                              setPhoneNumber('');
+                            }}
+                            className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        <div className="flex justify-center">
+                          <button
+                            onClick={() => {
+                              setLoginType(loginType === 'vendor' ? 'supplier' : 'vendor');
+                              setPhoneNumber('');
+                            }}
+                            className="text-sm text-gray-500 hover:text-gray-700"
+                          >
+                            Switch to {loginType === 'vendor' ? 'Supplier' : 'Vendor'} Login
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 {/* CTA Buttons */}
                 <div className="mt-5 sm:mt-8 sm:flex sm:justify-center lg:justify-start">
-                  <div className="rounded-md shadow">
-                    <button
-                      onClick={() => setShowVendorForm(true)}
-                      className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 md:py-4 md:text-lg md:px-10"
-                    >
-                      <UserIcon className="w-5 h-5 mr-2" />
-                      Join as Vendor
-                    </button>
-                  </div>
-                  <div className="mt-3 sm:mt-0 sm:ml-3">
-                    <button
-                      onClick={() => setShowSupplierForm(true)}
-                      className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 md:py-4 md:text-lg md:px-10"
-                    >
-                      <BuildingStorefrontIcon className="w-5 h-5 mr-2" />
-                      Join as Supplier
-                    </button>
+                  <div className="text-center lg:text-left">
+                    <p className="text-sm text-gray-500 mb-3">New to VendorCircle? Join now:</p>
+                    <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
+                      <button
+                        onClick={() => setShowVendorForm(true)}
+                        className="flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                      >
+                        <UserIcon className="w-5 h-5 mr-2" />
+                        Join as Vendor
+                      </button>
+                      <button
+                        onClick={() => setShowSupplierForm(true)}
+                        className="flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200"
+                      >
+                        <BuildingStorefrontIcon className="w-5 h-5 mr-2" />
+                        Join as Supplier
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -157,16 +356,17 @@ const HomePage: React.FC = () => {
         </div>
       </div>
 
-      {/* How it Works Section */}
-      <div className="bg-white">
-        <div className="max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:py-20 lg:px-8">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-3xl font-extrabold text-gray-900">How VendorCircle Works</h2>
-            <p className="mt-4 text-lg text-gray-500">
-              Simple steps to start saving money through group buying
+      {/* How it Works */}
+      <div className="py-12 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="lg:text-center">
+            <h2 className="text-base text-blue-600 font-semibold tracking-wide uppercase">How it Works</h2>
+            <p className="mt-2 text-3xl leading-8 font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+              Simple steps to start saving
             </p>
           </div>
-          <div className="mt-12 max-w-lg mx-auto grid gap-5 lg:grid-cols-3 lg:max-w-none">
+
+          <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="flex flex-col rounded-lg shadow-lg overflow-hidden">
               <div className="flex-1 bg-white p-6 flex flex-col justify-between">
                 <div className="flex-1">
@@ -174,10 +374,10 @@ const HomePage: React.FC = () => {
                     1
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900">
-                    Post Your Needs
+                    Create or Join Groups
                   </h3>
                   <p className="mt-3 text-base text-gray-500">
-                    List the ingredients you need daily. Our smart algorithm finds nearby vendors with similar needs.
+                    Form buying groups with nearby vendors or join existing ones. More members means better prices!
                   </p>
                 </div>
               </div>
@@ -190,10 +390,10 @@ const HomePage: React.FC = () => {
                     2
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900">
-                    Form Groups
+                    Place Group Orders
                   </h3>
                   <p className="mt-3 text-base text-gray-500">
-                    Join groups automatically or create your own. Chat with members and coordinate pickup details.
+                    Select ingredients you need and add them to your group order. Split quantities and costs automatically.
                   </p>
                 </div>
               </div>

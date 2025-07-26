@@ -1,25 +1,75 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from 'react-query';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.tsx';
 import { MagnifyingGlassIcon, FunnelIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
+// Custom hook for debouncing values
+const useDebounce = (value: string, delay: number) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
 const ProductCatalog: React.FC = () => {
   const navigate = useNavigate();
+  const { user, isAuthenticated, getUserId } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [cart, setCart] = useState<any[]>([]);
   
-  // Mock vendor ID (in real app, this would come from auth context)
-  const vendorId = new URLSearchParams(window.location.search).get('vendorId') || 'mock-vendor-id';
+  // Debounce search term to prevent excessive API calls
+  const debouncedSearchTerm = useDebounce(searchTerm, 500); // 500ms delay
+  
+  // Get authenticated user's vendor ID
+  const vendorId = getUserId();
 
-  // Fetch products
+  // Validate authentication
+  React.useEffect(() => {
+    if (!isAuthenticated || !vendorId) {
+      toast.error('Please login to browse products.');
+      navigate('/', { replace: true });
+      return;
+    }
+
+    // Only vendors can browse products for ordering
+    if (user?.type !== 'vendor') {
+      toast.error('Only vendors can browse products for ordering.');
+      navigate('/', { replace: true });
+      return;
+    }
+  }, [isAuthenticated, vendorId, user, navigate]);
+
+  // Show loading if not authenticated
+  if (!isAuthenticated || !vendorId || user?.type !== 'vendor') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Fetch products with debounced search
   const { data: products, isLoading } = useQuery(
-    ['products', searchTerm, selectedCategory],
+    ['products', debouncedSearchTerm, selectedCategory],
     async () => {
       const params = new URLSearchParams();
-      if (searchTerm) params.append('search', searchTerm);
+      if (debouncedSearchTerm) params.append('search', debouncedSearchTerm);
       if (selectedCategory) params.append('category', selectedCategory);
       
       const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/products?${params}`);
@@ -99,6 +149,9 @@ const ProductCatalog: React.FC = () => {
     navigate(`/vendor/${vendorId}/order/create?cart=${cartData}`);
   };
 
+  // Show loading indicator when search is being typed but not yet debounced
+  const isSearching = searchTerm !== debouncedSearchTerm;
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-4">
@@ -140,10 +193,19 @@ const ProductCatalog: React.FC = () => {
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Search products..."
                 />
+                {/* Search Loading Indicator */}
+                {isSearching && (
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
+                  </div>
+                )}
               </div>
+              {isSearching && (
+                <p className="text-xs text-gray-500 mt-1">Searching...</p>
+              )}
             </div>
 
             {/* Category Filter */}

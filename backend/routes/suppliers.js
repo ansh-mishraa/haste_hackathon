@@ -96,6 +96,54 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Get supplier by phone number (for login) - MUST come before /:id route
+router.get('/by-phone/:phone', async (req, res) => {
+  try {
+    const { phone } = req.params;
+    console.log('🔍 Searching for supplier with phone:', phone);
+    
+    // First, let's check if there are any suppliers in the database
+    const supplierCount = await prisma.supplier.count();
+    console.log('📊 Total suppliers in database:', supplierCount);
+    
+    // If there are suppliers, let's see a sample of phone numbers
+    if (supplierCount > 0) {
+      const sampleSuppliers = await prisma.supplier.findMany({
+        take: 3,
+        select: { phone: true, businessName: true }
+      });
+      console.log('📱 Sample supplier phone numbers in database:', sampleSuppliers);
+    }
+    
+    const supplier = await prisma.supplier.findUnique({
+      where: { phone },
+      select: {
+        id: true,
+        businessName: true,
+        phone: true,
+        contactPerson: true,
+        email: true,
+        deliveryAreas: true,
+        productCategories: true,
+        businessAddress: true,
+        isVerified: true,
+        rating: true
+      }
+    });
+
+    console.log('🔎 Query result for phone', phone, ':', supplier ? 'FOUND' : 'NOT FOUND');
+
+    if (!supplier) {
+      return res.status(404).json({ error: 'Supplier not found with this phone number' });
+    }
+
+    res.json(supplier);
+  } catch (error) {
+    console.error('❌ Error finding supplier by phone:', error);
+    res.status(500).json({ error: 'Failed to find supplier' });
+  }
+});
+
 // Get supplier by ID
 router.get('/:id', async (req, res) => {
   try {

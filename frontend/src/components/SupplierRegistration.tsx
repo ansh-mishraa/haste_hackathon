@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext.tsx';
 
 interface SupplierRegistrationProps {
   onClose: () => void;
@@ -9,17 +10,22 @@ interface SupplierRegistrationProps {
 }
 
 const SupplierRegistration: React.FC<SupplierRegistrationProps> = ({ onClose, onSuccess }) => {
+  const { login } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     phone: '',
     businessName: '',
+    businessRegNumber: '',
+    gstNumber: '',
     contactPerson: '',
     email: '',
-    businessAddress: '',
-    bankAccount: '',
     deliveryAreas: [] as string[],
-    productCategories: [] as string[]
+    productCategories: [] as string[],
+    bankAccount: '',
+    businessAddress: '',
+    latitude: '',
+    longitude: ''
   });
-  const [isLoading, setIsLoading] = useState(false);
 
   const availableAreas = [
     'FC Road, Pune',
@@ -45,7 +51,7 @@ const SupplierRegistration: React.FC<SupplierRegistrationProps> = ({ onClose, on
     'Ingredients'
   ];
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -73,6 +79,20 @@ const SupplierRegistration: React.FC<SupplierRegistrationProps> = ({ onClose, on
 
     try {
       const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers`, formData);
+
+      // Store user data in AuthContext
+      const supplierData = {
+        id: response.data.id,
+        type: 'supplier' as const,
+        name: response.data.contactPerson,
+        phone: response.data.phone,
+        businessName: response.data.businessName,
+        contactPerson: response.data.contactPerson,
+        isVerified: response.data.isVerified
+      };
+      
+      login(supplierData);
+
       toast.success('Registration successful! Welcome to VendorCircle!');
       onSuccess(response.data.id);
     } catch (error: any) {
@@ -115,7 +135,7 @@ const SupplierRegistration: React.FC<SupplierRegistrationProps> = ({ onClose, on
                 required
                 pattern="[0-9]{10}"
                 value={formData.phone}
-                onChange={handleInputChange}
+                onChange={handleChange}
                 className="flex-1 focus:ring-blue-500 focus:border-blue-500 block w-full rounded-none rounded-r-md sm:text-sm border-gray-300"
                 placeholder="9876543210"
               />
@@ -133,7 +153,7 @@ const SupplierRegistration: React.FC<SupplierRegistrationProps> = ({ onClose, on
               id="businessName"
               required
               value={formData.businessName}
-              onChange={handleInputChange}
+              onChange={handleChange}
               className="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
               placeholder="e.g., Sharma Wholesale Traders"
             />
@@ -150,7 +170,7 @@ const SupplierRegistration: React.FC<SupplierRegistrationProps> = ({ onClose, on
               id="contactPerson"
               required
               value={formData.contactPerson}
-              onChange={handleInputChange}
+              onChange={handleChange}
               className="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
               placeholder="Full name of contact person"
             />
@@ -166,7 +186,7 @@ const SupplierRegistration: React.FC<SupplierRegistrationProps> = ({ onClose, on
               name="email"
               id="email"
               value={formData.email}
-              onChange={handleInputChange}
+              onChange={handleChange}
               className="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
               placeholder="supplier@example.com"
             />
@@ -183,7 +203,7 @@ const SupplierRegistration: React.FC<SupplierRegistrationProps> = ({ onClose, on
               required
               rows={3}
               value={formData.businessAddress}
-              onChange={handleInputChange}
+              onChange={handleChange}
               className="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
               placeholder="Complete business address with pincode"
             />
@@ -200,7 +220,7 @@ const SupplierRegistration: React.FC<SupplierRegistrationProps> = ({ onClose, on
               id="bankAccount"
               required
               value={formData.bankAccount}
-              onChange={handleInputChange}
+              onChange={handleChange}
               className="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
               placeholder="Bank account for payments"
             />

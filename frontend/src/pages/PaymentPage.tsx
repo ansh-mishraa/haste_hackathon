@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useAuth } from '../context/AuthContext.tsx';
 import {
   CreditCardIcon,
   BanknotesIcon,
@@ -26,12 +27,43 @@ const PaymentPage: React.FC = () => {
   const { id: paymentId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user, isAuthenticated, getUserId } = useAuth();
   const [selectedMethod, setSelectedMethod] = useState<string>('UPI');
   const [upiId, setUpiId] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Get authenticated user's vendor ID
+  const vendorId = getUserId();
+
+  // Validate authentication
+  React.useEffect(() => {
+    if (!isAuthenticated || !vendorId) {
+      toast.error('Please login to access payment page.');
+      navigate('/', { replace: true });
+      return;
+    }
+
+    // Only vendors can make payments
+    if (user?.type !== 'vendor') {
+      toast.error('Only vendors can access payment page.');
+      navigate('/', { replace: true });
+      return;
+    }
+  }, [isAuthenticated, vendorId, user, navigate]);
+
+  // Show loading if not authenticated
+  if (!isAuthenticated || !vendorId || user?.type !== 'vendor') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Mock vendor ID (in real app, this would come from auth context)
-  const vendorId = new URLSearchParams(window.location.search).get('vendorId') || 'mock-vendor-id';
   const orderId = new URLSearchParams(window.location.search).get('orderId');
 
   // Fetch payment details

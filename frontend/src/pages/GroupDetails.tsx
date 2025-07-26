@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useAuth } from '../context/AuthContext.tsx';
 import {
   ChatBubbleLeftRightIcon,
   UsersIcon,
@@ -23,13 +24,42 @@ const GroupDetails: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const socket = useSocket();
+  const { user, isAuthenticated, getUserId } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [newMessage, setNewMessage] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Mock vendor ID (in real app, this would come from auth context)
-  const vendorId = new URLSearchParams(window.location.search).get('vendorId') || 'mock-vendor-id';
+  // Get vendorId from auth context instead of URL
+  const vendorId = getUserId();
+
+  // Validate authentication and redirect if not logged in
+  React.useEffect(() => {
+    if (!isAuthenticated || !vendorId) {
+      toast.error('Please login to access group details.');
+      navigate('/', { replace: true });
+      return;
+    }
+
+    // Only vendors can view group details
+    if (user?.type !== 'vendor') {
+      toast.error('Only vendors can access group details.');
+      navigate('/', { replace: true });
+      return;
+    }
+  }, [isAuthenticated, vendorId, user, navigate]);
+
+  // Show loading if not authenticated
+  if (!isAuthenticated || !vendorId || user?.type !== 'vendor') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Fetch group details
   const { data: group, isLoading } = useQuery(
@@ -60,6 +90,10 @@ const GroupDetails: React.FC = () => {
   // Join group mutation
   const joinGroupMutation = useMutation(
     async () => {
+      if (!vendorId) {
+        throw new Error('Invalid vendor ID. Please login again.');
+      }
+      
       const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/groups/${groupId}/join`, {
         vendorId
       });

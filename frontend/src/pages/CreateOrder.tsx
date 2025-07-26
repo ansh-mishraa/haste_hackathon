@@ -1,16 +1,69 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from 'react-query';
-import { PlusIcon, MinusIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '../context/AuthContext.tsx';
+import { PlusIcon, MinusIcon, ShoppingCartIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
 const CreateOrder: React.FC = () => {
   const { id: vendorId } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user, isAuthenticated, getUserId } = useAuth();
   const [orderItems, setOrderItems] = useState<any[]>([]);
   const [paymentMethod, setPaymentMethod] = useState('PAY_LATER');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [upiId, setUpiId] = useState('vendor@paytm');
+  const [paymentDays, setPaymentDays] = useState(30);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+
+  // Get authenticated user's vendor ID
+  const authenticatedVendorId = getUserId();
+
+  // Validate authentication and vendor access
+  React.useEffect(() => {
+    if (!isAuthenticated || !authenticatedVendorId) {
+      toast.error('Please login to create orders.');
+      navigate('/', { replace: true });
+      return;
+    }
+
+    // Check if user is a vendor
+    if (user?.type !== 'vendor') {
+      toast.error('Only vendors can create orders.');
+      navigate('/', { replace: true });
+      return;
+    }
+
+    // Check if URL vendorId matches authenticated user's ID
+    if (vendorId && vendorId !== authenticatedVendorId) {
+      toast.error('Access denied. You can only create orders for your account.');
+      navigate(`/vendor/${authenticatedVendorId}/order/create`, { replace: true });
+      return;
+    }
+
+    // If no vendorId in URL, redirect to correct URL
+    if (!vendorId) {
+      navigate(`/vendor/${authenticatedVendorId}/order/create`, { replace: true });
+      return;
+    }
+  }, [isAuthenticated, authenticatedVendorId, user, vendorId, navigate]);
+
+  // Show loading if not authenticated
+  if (!isAuthenticated || !authenticatedVendorId || user?.type !== 'vendor') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Use authenticated vendor ID for all operations
+  const currentVendorId = authenticatedVendorId;
 
   // Get cart data and group ID from URL params
   const urlParams = new URLSearchParams(window.location.search);
@@ -81,19 +134,31 @@ const CreateOrder: React.FC = () => {
     return orderItems.reduce((total, item) => total + (item.quantity * item.pricePerUnit), 0);
   };
 
-  const handleSubmit = async () => {
+  const handleCreateOrder = () => {
     if (orderItems.length === 0) {
       toast.error('Please add at least one product to your order');
+      return;
+    }
+    setShowPaymentModal(true);
+  };
+
+  const handlePaymentSubmit = async () => {
+    if (paymentMethod === 'PAY_LATER' && !agreedToTerms) {
+      toast.error('Please agree to the payment terms');
       return;
     }
 
     setIsLoading(true);
     try {
       const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/orders`, {
-        vendorId,
+        vendorId: currentVendorId,
         groupId: groupId || undefined,
         orderType: groupId ? 'GROUP' : 'INDIVIDUAL',
         paymentMethod,
+        paymentDetails: {
+          upiId: paymentMethod === 'UPI' ? upiId : undefined,
+          paymentDays: paymentMethod === 'PAY_LATER' ? paymentDays : undefined
+        },
         items: orderItems.map(item => ({
           productId: item.productId,
           quantity: item.quantity,
@@ -102,12 +167,14 @@ const CreateOrder: React.FC = () => {
         }))
       });
 
+      setShowPaymentModal(false);
+      
       if (groupId) {
         toast.success('Order added to group successfully!');
-        navigate(`/group/${groupId}?vendorId=${vendorId}`);
+        navigate(`/group/${groupId}?vendorId=${currentVendorId}`);
       } else {
-        toast.success('Order created successfully! Looking for groups...');
-        navigate(`/vendor/${vendorId}/dashboard`);
+        toast.success('Order created successfully!');
+        navigate(`/vendor/${currentVendorId}/dashboard`);
       }
     } catch (error: any) {
       console.error('Order creation error:', error);
@@ -237,41 +304,11 @@ const CreateOrder: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Payment Method */}
-                    <div className="border-t pt-4">
-                      <h3 className="text-sm font-medium text-gray-900 mb-2">Payment Method</h3>
-                      <div className="space-y-2">
-                        <label className="flex items-center">
-                          <input
-                            type="radio"
-                            name="paymentMethod"
-                            value="PAY_LATER"
-                            checked={paymentMethod === 'PAY_LATER'}
-                            onChange={(e) => setPaymentMethod(e.target.value)}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                          />
-                          <span className="ml-2 text-sm">Pay Later (Credit)</span>
-                        </label>
-                        <label className="flex items-center">
-                          <input
-                            type="radio"
-                            name="paymentMethod"
-                            value="PAY_NOW"
-                            checked={paymentMethod === 'PAY_NOW'}
-                            onChange={(e) => setPaymentMethod(e.target.value)}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                          />
-                          <span className="ml-2 text-sm">Pay Now (UPI/Card)</span>
-                        </label>
-                      </div>
-                    </div>
-
                     <button
-                      onClick={handleSubmit}
-                      disabled={isLoading}
-                      className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                      onClick={handleCreateOrder}
+                      className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700"
                     >
-                      {isLoading ? 'Creating Order...' : 'Create Order'}
+                      Proceed to Payment
                     </button>
                   </div>
                 )}
@@ -279,6 +316,138 @@ const CreateOrder: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Payment Modal */}
+        {showPaymentModal && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Choose Payment Method</h3>
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="mb-4">
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <div className="flex justify-between">
+                    <span>Total Amount:</span>
+                    <span className="font-semibold">{formatCurrency(calculateTotal())}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {/* UPI Payment */}
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="UPI"
+                    checked={paymentMethod === 'UPI'}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  />
+                  <div className="flex-1">
+                    <span className="font-medium">Pay Online (UPI)</span>
+                    <p className="text-sm text-gray-500">Pay instantly using UPI</p>
+                    {paymentMethod === 'UPI' && (
+                      <div className="mt-2 p-3 bg-blue-50 rounded-lg">
+                        <p className="text-sm font-medium mb-2">Scan QR Code or Use UPI ID:</p>
+                        <div className="bg-white p-2 rounded border text-center">
+                          <p className="font-mono text-blue-600">{upiId}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </label>
+
+                {/* Cash Payment */}
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="CASH"
+                    checked={paymentMethod === 'CASH'}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  />
+                  <div className="flex-1">
+                    <span className="font-medium">Pay by Cash</span>
+                    <p className="text-sm text-gray-500">Pay in cash upon delivery</p>
+                  </div>
+                </label>
+
+                {/* Pay Later */}
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="PAY_LATER"
+                    checked={paymentMethod === 'PAY_LATER'}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  />
+                  <div className="flex-1">
+                    <span className="font-medium">Pay Later (Credit)</span>
+                    <p className="text-sm text-gray-500">Pay within specified days</p>
+                    {paymentMethod === 'PAY_LATER' && (
+                      <div className="mt-2 p-3 bg-yellow-50 rounded-lg">
+                        <div className="mb-3">
+                          <label className="block text-sm font-medium mb-1">Payment due in (days):</label>
+                          <select 
+                            value={paymentDays} 
+                            onChange={(e) => setPaymentDays(Number(e.target.value))}
+                            className="w-full p-2 border border-gray-300 rounded-md"
+                          >
+                            <option value={7}>7 days</option>
+                            <option value={15}>15 days</option>
+                            <option value={30}>30 days</option>
+                            <option value={45}>45 days</option>
+                          </select>
+                        </div>
+                        <div className="text-xs text-gray-600 mb-2">
+                          <p><strong>Payment Agreement:</strong></p>
+                          <p>• Payment is due within {paymentDays} days from delivery</p>
+                          <p>• Late payment may incur additional charges</p>
+                          <p>• Credit terms are subject to approval</p>
+                        </div>
+                        <label className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            checked={agreedToTerms}
+                            onChange={(e) => setAgreedToTerms(e.target.checked)}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <span className="text-xs">I agree to the payment terms</span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                </label>
+              </div>
+
+              <div className="mt-6 flex space-x-3">
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePaymentSubmit}
+                  disabled={isLoading}
+                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {isLoading ? 'Creating Order...' : 'Create Order'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

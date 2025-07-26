@@ -110,7 +110,14 @@ router.post('/', async (req, res) => {
           paymentMethod: 'PAY_LATER',
           isGroupOrder: true,
           items: {
-            create: initialOrderItems
+            create: initialOrderItems.map(item => ({
+              productId: item.productId,
+              quantity: item.quantity,
+              unit: item.unit,
+              pricePerUnit: item.pricePerUnit,
+              totalPrice: item.quantity * item.pricePerUnit, // Add missing totalPrice field
+              notes: item.notes || null
+            }))
           }
         }
       });
@@ -240,11 +247,23 @@ router.post('/:id/join', async (req, res) => {
       return res.status(400).json({ error: 'Confirmation deadline has passed' });
     }
 
+    // Validate that vendor exists
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { id: true, name: true, businessType: true }
+    });
+
+    if (!vendor) {
+      return res.status(404).json({ error: 'Vendor not found. Please login again.' });
+    }
+
     // Check if vendor is already in group
     const existingMembership = group.memberships.find(m => m.vendorId === vendorId);
     if (existingMembership) {
       return res.status(400).json({ error: 'Already a member of this group' });
     }
+
+    console.log('✅ Vendor validation passed. Creating membership for:', vendor.name, '(', vendorId, ')');
 
     // Add vendor to group
     const membership = await prisma.groupMembership.create({

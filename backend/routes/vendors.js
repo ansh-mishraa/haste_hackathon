@@ -90,6 +90,53 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Get vendor by phone number (for login) - MUST come before /:id route
+router.get('/by-phone/:phone', async (req, res) => {
+  try {
+    const { phone } = req.params;
+    console.log('🔍 Searching for vendor with phone:', phone);
+    
+    // First, let's check if there are any vendors in the database
+    const vendorCount = await prisma.vendor.count();
+    console.log('📊 Total vendors in database:', vendorCount);
+    
+    // If there are vendors, let's see a sample of phone numbers
+    if (vendorCount > 0) {
+      const sampleVendors = await prisma.vendor.findMany({
+        take: 3,
+        select: { phone: true, name: true }
+      });
+      console.log('📱 Sample phone numbers in database:', sampleVendors);
+    }
+    
+    const vendor = await prisma.vendor.findUnique({
+      where: { phone },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        businessType: true,
+        businessLocation: true,
+        trustScore: true,
+        isVerified: true,
+        availableCredit: true,
+        usedCredit: true
+      }
+    });
+
+    console.log('🔎 Query result for phone', phone, ':', vendor ? 'FOUND' : 'NOT FOUND');
+
+    if (!vendor) {
+      return res.status(404).json({ error: 'Vendor not found with this phone number' });
+    }
+
+    res.json(vendor);
+  } catch (error) {
+    console.error('❌ Error finding vendor by phone:', error);
+    res.status(500).json({ error: 'Failed to find vendor' });
+  }
+});
+
 // Get vendor by ID
 router.get('/:id', async (req, res) => {
   try {
