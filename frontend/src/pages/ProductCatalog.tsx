@@ -52,17 +52,8 @@ const ProductCatalog: React.FC = () => {
     }
   }, [isAuthenticated, vendorId, user, navigate]);
 
-  // Show loading if not authenticated
-  if (!isAuthenticated || !vendorId || user?.type !== 'vendor') {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  // Check if we should enable queries
+  const shouldEnableQueries = isAuthenticated && vendorId && user?.type === 'vendor';
 
   // Fetch products with debounced search
   const { data: products, isLoading } = useQuery(
@@ -74,6 +65,9 @@ const ProductCatalog: React.FC = () => {
       
       const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/products?${params}`);
       return response.data;
+    },
+    {
+      enabled: shouldEnableQueries
     }
   );
 
@@ -83,8 +77,23 @@ const ProductCatalog: React.FC = () => {
     async () => {
       const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/products/categories`);
       return response.data;
+    },
+    {
+      enabled: shouldEnableQueries
     }
   );
+
+  // Show loading if not authenticated
+  if (!isAuthenticated || !vendorId || user?.type !== 'vendor') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {

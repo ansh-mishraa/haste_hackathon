@@ -49,17 +49,8 @@ const GroupDetails: React.FC = () => {
     }
   }, [isAuthenticated, vendorId, user, navigate]);
 
-  // Show loading if not authenticated
-  if (!isAuthenticated || !vendorId || user?.type !== 'vendor') {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  // Check if we should enable queries
+  const shouldEnableQueries = isAuthenticated && vendorId && user?.type === 'vendor';
 
   // Fetch group details
   const { data: group, isLoading } = useQuery(
@@ -69,7 +60,7 @@ const GroupDetails: React.FC = () => {
       return response.data;
     },
     {
-      enabled: !!groupId,
+      enabled: shouldEnableQueries && !!groupId,
       refetchInterval: 30000
     }
   );
@@ -82,7 +73,7 @@ const GroupDetails: React.FC = () => {
       return response.data;
     },
     {
-      enabled: !!groupId,
+      enabled: shouldEnableQueries && !!groupId,
       refetchInterval: 5000 // More frequent for chat
     }
   );
@@ -204,6 +195,18 @@ const GroupDetails: React.FC = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Show loading if not authenticated
+  if (!isAuthenticated || !vendorId || user?.type !== 'vendor') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {

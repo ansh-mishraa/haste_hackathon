@@ -35,6 +35,34 @@ const PaymentPage: React.FC = () => {
   // Get authenticated user's vendor ID
   const vendorId = getUserId();
 
+  // Check if we should enable queries
+  const shouldEnableQueries = isAuthenticated && vendorId && user?.type === 'vendor';
+
+  // Mock vendor ID (in real app, this would come from auth context)
+  const orderId = new URLSearchParams(window.location.search).get('orderId');
+
+  // Fetch payment details
+  const { data: payment, isLoading } = useQuery(
+    ['payment', paymentId],
+    async () => {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/payments/${paymentId}`);
+      return response.data;
+    },
+    {
+      enabled: shouldEnableQueries && !!paymentId
+    }
+  );
+
+  // Fetch vendor credit info
+  const { data: vendor } = useQuery(
+    ['vendor', vendorId],
+    async () => {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/vendors/${vendorId}`);
+      return response.data;
+    },
+    { enabled: shouldEnableQueries && !!vendorId }
+  );
+
   // Validate authentication
   React.useEffect(() => {
     if (!isAuthenticated || !vendorId) {
@@ -50,43 +78,6 @@ const PaymentPage: React.FC = () => {
       return;
     }
   }, [isAuthenticated, vendorId, user, navigate]);
-
-  // Show loading if not authenticated
-  if (!isAuthenticated || !vendorId || user?.type !== 'vendor') {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Mock vendor ID (in real app, this would come from auth context)
-  const orderId = new URLSearchParams(window.location.search).get('orderId');
-
-  // Fetch payment details
-  const { data: payment, isLoading } = useQuery(
-    ['payment', paymentId],
-    async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/payments/${paymentId}`);
-      return response.data;
-    },
-    {
-      enabled: !!paymentId
-    }
-  );
-
-  // Fetch vendor credit info
-  const { data: vendor } = useQuery(
-    ['vendor', vendorId],
-    async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/vendors/${vendorId}`);
-      return response.data;
-    },
-    { enabled: !!vendorId }
-  );
 
   // Process payment mutation
   const processPaymentMutation = useMutation(
@@ -111,6 +102,18 @@ const PaymentPage: React.FC = () => {
       }
     }
   );
+
+  // Show loading if not authenticated
+  if (!isAuthenticated || !vendorId || user?.type !== 'vendor') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const paymentMethods: PaymentMethod[] = [
     {
