@@ -740,6 +740,122 @@ router.put('/bids/:bidId', async (req, res) => {
   }
 });
 
+// Update bid (edit bid)
+router.put('/bids/:bidId/update', async (req, res) => {
+  try {
+    const bidId = req.params.bidId;
+    const { totalAmount, message, deliveryTime, validityHours = 24 } = req.body;
+
+    // Check if bid exists and belongs to the supplier
+    const existingBid = await prisma.bid.findUnique({
+      where: { id: bidId },
+      include: {
+        order: {
+          include: {
+            vendor: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        },
+        supplier: {
+          select: {
+            id: true,
+            businessName: true
+          }
+        }
+      }
+    });
+
+    if (!existingBid) {
+      return res.status(404).json({ error: 'Bid not found' });
+    }
+
+    // Check if bid is still pending (can only edit pending bids)
+    if (existingBid.status !== 'PENDING') {
+      return res.status(400).json({ error: 'Can only edit pending bids' });
+    }
+
+    // Create new validity deadline
+    const validUntil = new Date();
+    validUntil.setHours(validUntil.getHours() + validityHours);
+
+    const updatedBid = await prisma.bid.update({
+      where: { id: bidId },
+      data: {
+        totalAmount: totalAmount || existingBid.totalAmount,
+        message: message || existingBid.message,
+        deliveryTime: deliveryTime ? new Date(deliveryTime) : existingBid.deliveryTime,
+        validUntil
+      },
+      include: {
+        supplier: {
+          select: {
+            id: true,
+            businessName: true,
+            contactPerson: true,
+            rating: true
+          }
+        },
+        order: {
+          include: {
+            vendor: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
+            group: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    res.json(updatedBid);
+  } catch (error) {
+    console.error('Bid update error:', error);
+    res.status(500).json({ error: 'Failed to update bid' });
+  }
+});
+
+// Delete bid
+router.delete('/bids/:bidId', async (req, res) => {
+  try {
+    const bidId = req.params.bidId;
+
+    // Check if bid exists
+    const existingBid = await prisma.bid.findUnique({
+      where: { id: bidId }
+    });
+
+    if (!existingBid) {
+      return res.status(404).json({ error: 'Bid not found' });
+    }
+
+    // Check if bid is still pending (can only delete pending bids)
+    if (existingBid.status !== 'PENDING') {
+      return res.status(400).json({ error: 'Can only delete pending bids' });
+    }
+
+    // Delete the bid
+    await prisma.bid.delete({
+      where: { id: bidId }
+    });
+
+    res.json({ message: 'Bid deleted successfully' });
+  } catch (error) {
+    console.error('Bid deletion error:', error);
+    res.status(500).json({ error: 'Failed to delete bid' });
+  }
+});
+
 // Get available orders for bidding
 router.get('/:id/available-orders', async (req, res) => {
   try {
@@ -1038,6 +1154,232 @@ router.get('/:id/analytics', async (req, res) => {
   } catch (error) {
     console.error('Supplier analytics error:', error);
     res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
+module.exports = router; 
+router.post('/:id/rating', async (req, res) => {
+  try {
+    const supplierId = req.params.id;
+    const {
+      fromVendorId,
+      orderId,
+      productQuality,
+      deliveryTime,
+      communication,
+      priceValue,
+      overallService,
+      comment
+    } = req.body;
+
+    // Validate rating values (1-5)
+    const ratings = [productQuality, deliveryTime, communication, priceValue, overallService];
+    if (ratings.some(rating => rating < 1 || rating > 5)) {
+      return res.status(400).json({ error: 'All ratings must be between 1 and 5' });
+    }
+
+    // Check if rating already exists for this order
+    const existingRating = await prisma.rating.findFirst({
+      where: {
+        fromVendorId,
+        supplierId,
+        orderId
+      }
+    });
+
+    if (existingRating) {
+      return res.status(400).json({ error: 'Rating already exists for this order' });
+    }
+
+    // Calculate average rating
+    const averageRating = (productQuality + deliveryTime + communication + priceValue + overallService) / 5;
+
+    // Create the rating
+    const rating = await prisma.rating.create({
+      data: {
+        fromVendorId,
+        supplierId,
+        orderId,
+        productQuality,
+        deliveryTime,
+        communication,
+        priceValue,
+        overallService,
+        averageRating,
+        comment
+      },
+      include: {
+        fromVendor: {
+          select: {
+            id: true,
+            name: true,
+            businessType: true
+          }
+        },
+        supplier: {
+          select: {
+            id: true,
+            businessName: true
+          }
+        }
+      }
+    });
+
+    // Update supplier's overall rating
+    await updateSupplierRating(supplierId);
+
+    res.status(201).json(rating);
+  } catch (error) {
+    console.error('Rating creation error:', error);
+    res.status(500).json({ error: 'Failed to create rating' });
+  }
+});
+
+// Helper function to update supplier's overall rating
+async function updateSupplierRating(supplierId) {
+  try {
+    // Get all ratings for this supplier
+    const ratings = await prisma.rating.findMany({
+      where: { supplierId },
+      select: { averageRating: true }
+    });
+
+    if (ratings.length > 0) {
+      // Calculate new overall rating
+      const totalRating = ratings.reduce((sum, rating) => sum + rating.averageRating, 0);
+      const newOverallRating = totalRating / ratings.length;
+
+      // Update supplier's rating
+      await prisma.supplier.update({
+        where: { id: supplierId },
+        data: { rating: newOverallRating }
+      });
+    }
+  } catch (error) {
+    console.error('Error updating supplier rating:', error);
+  }
+}
+
+// Get ratings for supplier
+router.get('/:id/ratings', async (req, res) => {
+  try {
+    const supplierId = req.params.id;
+    const { limit = 20, offset = 0 } = req.query;
+
+    const ratings = await prisma.rating.findMany({
+      where: { supplierId },
+      include: {
+        fromVendor: {
+          select: {
+            id: true,
+            name: true,
+            businessType: true,
+            businessLocation: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: parseInt(limit),
+      skip: parseInt(offset)
+    });
+
+    // Calculate rating breakdown
+    const ratingBreakdown = {
+      productQuality: 0,
+      deliveryTime: 0,
+      communication: 0,
+      priceValue: 0,
+      overallService: 0,
+      totalRatings: ratings.length
+    };
+
+    if (ratings.length > 0) {
+      ratingBreakdown.productQuality = ratings.reduce((sum, r) => sum + r.productQuality, 0) / ratings.length;
+      ratingBreakdown.deliveryTime = ratings.reduce((sum, r) => sum + r.deliveryTime, 0) / ratings.length;
+      ratingBreakdown.communication = ratings.reduce((sum, r) => sum + r.communication, 0) / ratings.length;
+      ratingBreakdown.priceValue = ratings.reduce((sum, r) => sum + r.priceValue, 0) / ratings.length;
+      ratingBreakdown.overallService = ratings.reduce((sum, r) => sum + r.overallService, 0) / ratings.length;
+    }
+
+    res.json({
+      ratings,
+      breakdown: ratingBreakdown
+    });
+  } catch (error) {
+    console.error('Error fetching ratings:', error);
+    res.status(500).json({ error: 'Failed to fetch ratings' });
+  }
+});
+
+// Get past deliveries for supplier
+router.get('/:id/past-deliveries', async (req, res) => {
+  try {
+    const supplierId = req.params.id;
+    const { limit = 20, page = 1 } = req.query;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [deliveries, totalCount] = await Promise.all([
+      prisma.order.findMany({
+        where: {
+          supplierId,
+          status: 'DELIVERED'
+        },
+        include: {
+          vendor: {
+            select: {
+              id: true,
+              name: true,
+              businessType: true,
+              businessLocation: true
+            }
+          },
+          group: {
+            select: {
+              id: true,
+              name: true,
+              pickupLocation: true
+            }
+          },
+          items: {
+            include: {
+              product: true
+            }
+          },
+          payments: {
+            select: {
+              id: true,
+              amount: true,
+              method: true,
+              status: true,
+              createdAt: true
+            }
+          }
+        },
+        orderBy: { deliveredAt: 'desc' },
+        take: parseInt(limit),
+        skip
+      }),
+      prisma.order.count({
+        where: {
+          supplierId,
+          status: 'DELIVERED'
+        }
+      })
+    ]);
+
+    res.json({
+      deliveries,
+      pagination: {
+        total: totalCount,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(totalCount / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Past deliveries error:', error);
+    res.status(500).json({ error: 'Failed to fetch past deliveries' });
   }
 });
 

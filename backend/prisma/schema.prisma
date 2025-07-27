@@ -221,17 +221,22 @@ model CreditTransaction {
 }
 
 model Rating {
-  id           String    @id @default(cuid())
-  fromVendorId String?
-  toVendorId   String?
-  supplierId   String?
-  orderId      String?
-  rating       Int
-  comment      String?
-  createdAt    DateTime  @default(now())
-  fromVendor   Vendor?   @relation("VendorGivenRatings", fields: [fromVendorId], references: [id])
-  supplier     Supplier? @relation("SupplierRatings", fields: [supplierId], references: [id])
-  toVendor     Vendor?   @relation("VendorRatings", fields: [toVendorId], references: [id])
+  id              String    @id @default(cuid())
+  fromVendorId    String?
+  toVendorId      String?
+  supplierId      String?
+  orderId         String?
+  productQuality  Int       // Rating for product quality (1-5)
+  deliveryTime    Int       // Rating for delivery timeliness (1-5)
+  communication   Int       // Rating for communication (1-5)
+  priceValue      Int       // Rating for pricing/value (1-5)
+  overallService  Int       // Rating for overall service (1-5)
+  averageRating   Float     // Calculated average of the 5 parameters
+  comment         String?
+  createdAt       DateTime  @default(now())
+  fromVendor      Vendor?   @relation("VendorGivenRatings", fields: [fromVendorId], references: [id])
+  supplier        Supplier? @relation("SupplierRatings", fields: [supplierId], references: [id])
+  toVendor        Vendor?   @relation("VendorRatings", fields: [toVendorId], references: [id])
 
   @@map("ratings")
 }

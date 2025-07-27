@@ -7,7 +7,8 @@ import {
   UsersIcon,
   TruckIcon,
   ClockIcon,
-  ArrowRightIcon
+  ArrowRightIcon,
+  SparklesIcon
 } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -22,6 +23,7 @@ const HomePage: React.FC = () => {
   const [loginType, setLoginType] = useState<'vendor' | 'supplier'>('vendor');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isGuestLoggingIn, setIsGuestLoggingIn] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
 
@@ -142,6 +144,59 @@ const HomePage: React.FC = () => {
     }
   };
 
+  const handleGuestVendorLogin = async () => {
+    setIsGuestLoggingIn(true);
+    try {
+      // Login with existing vendor account
+      const existingVendor = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/vendors/by-phone/9876543210`);
+      const vendorData = {
+        id: existingVendor.data.id,
+        type: 'vendor' as const,
+        name: existingVendor.data.name,
+        phone: existingVendor.data.phone,
+        businessType: existingVendor.data.businessType,
+        businessLocation: existingVendor.data.businessLocation,
+        trustScore: existingVendor.data.trustScore,
+        isVerified: existingVendor.data.isVerified
+      };
+      
+      login(vendorData);
+      toast.success('Guest vendor login successful! Welcome to VendorCircle.');
+      navigate(`/vendor/${vendorData.id}/dashboard`);
+    } catch (error: any) {
+      console.error('Guest vendor login error:', error);
+      toast.error('Failed to login as guest vendor. Please check if the account exists.');
+    } finally {
+      setIsGuestLoggingIn(false);
+    }
+  };
+
+  const handleGuestSupplierLogin = async () => {
+    setIsGuestLoggingIn(true);
+    try {
+      // Login with existing supplier account
+      const existingSupplier = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/by-phone/9876543220`);
+      const supplierData = {
+        id: existingSupplier.data.id,
+        type: 'supplier' as const,
+        name: existingSupplier.data.contactPerson,
+        phone: existingSupplier.data.phone,
+        businessName: existingSupplier.data.businessName,
+        contactPerson: existingSupplier.data.contactPerson,
+        isVerified: existingSupplier.data.isVerified
+      };
+      
+      login(supplierData);
+      toast.success('Guest supplier login successful! Welcome to VendorCircle.');
+      navigate(`/supplier/${supplierData.id}/dashboard`);
+    } catch (error: any) {
+      console.error('Guest supplier login error:', error);
+      toast.error('Failed to login as guest supplier. Please check if the account exists.');
+    } finally {
+      setIsGuestLoggingIn(false);
+    }
+  };
+
   const handleLoginSubmit = () => {
     if (loginType === 'vendor') {
       handleVendorLogin();
@@ -193,6 +248,32 @@ const HomePage: React.FC = () => {
                           <BuildingStorefrontIcon className="w-4 h-4 mr-2" />
                           Login as Supplier
                         </button>
+                      </div>
+                      
+                      {/* Guest Login Section */}
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <p className="text-sm text-gray-500 mb-3 text-center">For Testing:</p>
+                        <div className="space-y-2">
+                          <button
+                            onClick={handleGuestVendorLogin}
+                            disabled={isGuestLoggingIn}
+                            className="w-full flex items-center justify-center px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors disabled:opacity-50"
+                          >
+                            <SparklesIcon className="w-4 h-4 mr-2" />
+                            {isGuestLoggingIn ? 'Creating Guest Vendor...' : 'Guest Login as Vendor'}
+                          </button>
+                          <button
+                            onClick={handleGuestSupplierLogin}
+                            disabled={isGuestLoggingIn}
+                            className="w-full flex items-center justify-center px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors disabled:opacity-50"
+                          >
+                            <SparklesIcon className="w-4 h-4 mr-2" />
+                            {isGuestLoggingIn ? 'Creating Guest Supplier...' : 'Guest Login as Supplier'}
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-2 text-center">
+                          Creates test accounts for demo purposes
+                        </p>
                       </div>
                     </div>
                   </div>

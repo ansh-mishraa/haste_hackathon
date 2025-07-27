@@ -13,8 +13,10 @@ import {
   CurrencyRupeeIcon,
   XMarkIcon,
   MapPinIcon,
-  CheckIcon
+  CheckIcon,
+  StarIcon
 } from '@heroicons/react/24/outline';
+import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -826,11 +828,171 @@ const BidsModal: React.FC<{
 };
 
 // Order History Modal Component
+const RatingModal: React.FC<{
+  order: any;
+  supplierId: string;
+  vendorId: string;
+  onClose: () => void;
+  onRatingSubmitted: () => void;
+}> = ({ order, supplierId, vendorId, onClose, onRatingSubmitted }) => {
+  const [ratings, setRatings] = useState({
+    productQuality: 0,
+    deliveryTime: 0,
+    communication: 0,
+    priceValue: 0,
+    overallService: 0
+  });
+  const [comment, setComment] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleRatingChange = (parameter: string, value: number) => {
+    setRatings(prev => ({
+      ...prev,
+      [parameter]: value
+    }));
+  };
+
+  const handleSubmit = async () => {
+    if (Object.values(ratings).some(rating => rating === 0)) {
+      toast.error('Please rate all parameters');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await axios.post(`${API_URL}/api/suppliers/${supplierId}/rating`, {
+        fromVendorId: vendorId,
+        orderId: order.id,
+        ...ratings,
+        comment
+      });
+      
+      toast.success('Rating submitted successfully!');
+      onRatingSubmitted();
+      onClose();
+    } catch (error: any) {
+      console.error('Rating submission error:', error);
+      toast.error(error.response?.data?.error || 'Failed to submit rating');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const renderStars = (parameter: string, value: number) => (
+    <div className="flex items-center space-x-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          onClick={() => handleRatingChange(parameter, star)}
+          className="text-yellow-400 hover:text-yellow-500 transition-colors"
+        >
+          {star <= value ? (
+            <StarIconSolid className="w-6 h-6" />
+          ) : (
+            <StarIcon className="w-6 h-6" />
+          )}
+        </button>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Rate Your Experience</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <XMarkIcon className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div className="text-sm text-gray-600">
+            <p className="font-medium">Order #{order.id.substring(0, 8)}</p>
+            <p className="text-gray-500">Please rate your experience with this supplier</p>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Product Quality
+              </label>
+              {renderStars('productQuality', ratings.productQuality)}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Delivery Time
+              </label>
+              {renderStars('deliveryTime', ratings.deliveryTime)}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Communication
+              </label>
+              {renderStars('communication', ratings.communication)}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Price Value
+              </label>
+              {renderStars('priceValue', ratings.priceValue)}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Overall Service
+              </label>
+              {renderStars('overallService', ratings.overallService)}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Additional Comments (Optional)
+            </label>
+            <textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows={3}
+              placeholder="Share your experience..."
+            />
+          </div>
+        </div>
+
+        <div className="flex space-x-3 mt-6">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting || Object.values(ratings).some(rating => rating === 0)}
+            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? 'Submitting...' : 'Submit Rating'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const OrderHistoryModal: React.FC<{
   vendorId: string;
   orders: any[];
   onClose: () => void;
-}> = ({ vendorId, orders, onClose }) => {
+  onRateSupplier: (order: any, supplierId: string) => void;
+}> = ({ vendorId, orders, onClose, onRateSupplier }) => {
   const navigate = useNavigate();
   
   const formatCurrency = (amount: number) => {
@@ -950,6 +1112,19 @@ const OrderHistoryModal: React.FC<{
                     </span>
                   </div>
                 )}
+
+                {/* Rating button for delivered orders */}
+                {order.status === 'DELIVERED' && order.supplier && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => onRateSupplier(order, order.supplier.id)}
+                      className="flex items-center px-4 py-2 text-sm font-medium text-white bg-yellow-600 rounded-md hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                    >
+                      <StarIcon className="h-4 w-4 mr-2" />
+                      Rate Supplier
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -969,6 +1144,8 @@ const VendorDashboard: React.FC = () => {
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showBidsModal, setShowBidsModal] = useState(false);
   const [showOrderHistoryModal, setShowOrderHistoryModal] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   // Get authenticated user's vendor ID
   const authenticatedVendorId = getUserId();
@@ -1443,6 +1620,27 @@ const VendorDashboard: React.FC = () => {
             vendorId={currentVendorId!}
             orders={vendorOrders || []}
             onClose={() => setShowOrderHistoryModal(false)}
+            onRateSupplier={(order, supplierId) => {
+              setSelectedOrder(order);
+              setShowRatingModal(true);
+              setShowOrderHistoryModal(false);
+            }}
+          />
+        )}
+
+        {showRatingModal && selectedOrder && (
+          <RatingModal
+            order={selectedOrder}
+            supplierId={selectedOrder.supplier.id}
+            vendorId={currentVendorId!}
+            onClose={() => {
+              setShowRatingModal(false);
+              setSelectedOrder(null);
+            }}
+            onRatingSubmitted={() => {
+              queryClient.invalidateQueries(['vendorOrders', currentVendorId]);
+              queryClient.invalidateQueries(['vendorDashboard', currentVendorId]);
+            }}
           />
         )}
 

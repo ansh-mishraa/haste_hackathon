@@ -15,7 +15,10 @@ import {
   BanknotesIcon,
   StarIcon,
   ShoppingBagIcon,
-  PhotoIcon
+  PhotoIcon,
+  PencilIcon,
+  TrashIcon,
+  ArchiveBoxIcon
 } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -38,7 +41,7 @@ const ManageProductsTab: React.FC<{ supplierId: string }> = ({ supplierId }) => 
   const { data: supplierProducts, isLoading: isLoadingProducts } = useQuery(
     ['supplierProducts', supplierId],
     async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/products/supplier/${supplierId}`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/products/supplier/${supplierId}`);
       return response.data;
     },
     { enabled: !!supplierId }
@@ -47,7 +50,7 @@ const ManageProductsTab: React.FC<{ supplierId: string }> = ({ supplierId }) => 
   // Create product mutation
   const createProductMutation = useMutation(
     async (productData: any) => {
-      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/products/supplier/${supplierId}`, productData);
+      const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/products/supplier/${supplierId}`, productData);
       return response.data;
     },
     {
@@ -311,6 +314,7 @@ const SupplierDashboard: React.FC = () => {
   const { user, isAuthenticated, isLoading, getUserId, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [bidModal, setBidModal] = useState<{ isOpen: boolean; order: any }>({ isOpen: false, order: null });
+  const [editBidModal, setEditBidModal] = useState<{ isOpen: boolean; bid: any }>({ isOpen: false, bid: null });
 
   // Get authenticated user's supplier ID
   const authenticatedSupplierId = getUserId();
@@ -323,7 +327,7 @@ const SupplierDashboard: React.FC = () => {
   const { data: dashboardData, isLoading: isDashboardLoading, error } = useQuery(
     ['supplierDashboard', currentSupplierId],
     async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/suppliers/${currentSupplierId}/dashboard`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}/dashboard`);
       return response.data;
     },
     {
@@ -343,7 +347,7 @@ const SupplierDashboard: React.FC = () => {
   const { data: supplier } = useQuery(
     ['supplier', currentSupplierId],
     async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/suppliers/${currentSupplierId}`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}`);
       return response.data;
     },
     { 
@@ -362,7 +366,7 @@ const SupplierDashboard: React.FC = () => {
   const { data: availableOrders } = useQuery(
     ['availableOrders', currentSupplierId],
     async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/suppliers/${currentSupplierId}/available-orders`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}/available-orders`);
       return response.data;
     },
     { enabled: shouldEnableQueries && !!currentSupplierId }
@@ -372,10 +376,20 @@ const SupplierDashboard: React.FC = () => {
   const { data: supplierBids } = useQuery(
     ['supplierBids', currentSupplierId],
     async () => {
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/suppliers/${currentSupplierId}/bids`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}/bids`);
       return response.data;
     },
     { enabled: shouldEnableQueries && !!currentSupplierId }
+  );
+
+  // Fetch past deliveries
+  const { data: pastDeliveries } = useQuery(
+    ['pastDeliveries', currentSupplierId],
+    async () => {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/${currentSupplierId}/past-deliveries`);
+      return response.data;
+    },
+    { enabled: shouldEnableQueries && !!currentSupplierId && activeTab === 'past-deliveries' }
   );
 
   // Validate authentication and supplier access
@@ -415,7 +429,7 @@ const SupplierDashboard: React.FC = () => {
   // Create bid mutation
   const createBidMutation = useMutation(
     async (bidData: any) => {
-      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/suppliers/bids`, bidData);
+      const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/bids`, bidData);
       return response.data;
     },
     {
@@ -431,10 +445,45 @@ const SupplierDashboard: React.FC = () => {
     }
   );
 
+  // Update bid mutation
+  const updateBidMutation = useMutation(
+    async ({ bidId, bidData }: { bidId: string; bidData: any }) => {
+      const response = await axios.put(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/bids/${bidId}/update`, bidData);
+      return response.data;
+    },
+    {
+      onSuccess: () => {
+        toast.success('Bid updated successfully!');
+        queryClient.invalidateQueries(['supplierBids', currentSupplierId]);
+        setEditBidModal({ isOpen: false, bid: null });
+      },
+      onError: (error: any) => {
+        toast.error(error.response?.data?.error || 'Failed to update bid');
+      }
+    }
+  );
+
+  // Delete bid mutation
+  const deleteBidMutation = useMutation(
+    async (bidId: string) => {
+      const response = await axios.delete(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/suppliers/bids/${bidId}`);
+      return response.data;
+    },
+    {
+      onSuccess: () => {
+        toast.success('Bid deleted successfully!');
+        queryClient.invalidateQueries(['supplierBids', currentSupplierId]);
+      },
+      onError: (error: any) => {
+        toast.error(error.response?.data?.error || 'Failed to delete bid');
+      }
+    }
+  );
+
   // Update order status mutation
   const updateOrderStatusMutation = useMutation(
     async ({ orderId, status }: { orderId: string; status: string }) => {
-      const response = await axios.put(`${process.env.REACT_APP_API_URL}/api/orders/${orderId}/status`, {
+      const response = await axios.put(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/orders/${orderId}/status`, {
         status,
         supplierId: currentSupplierId
       });
@@ -497,6 +546,26 @@ const SupplierDashboard: React.FC = () => {
     };
 
     createBidMutation.mutate(bidData);
+  };
+
+  const handleEditBidSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    
+    const bidData = {
+      totalAmount: parseFloat(formData.get('totalAmount') as string),
+      message: formData.get('message') as string,
+      deliveryTime: formData.get('deliveryTime') as string,
+      validityHours: 24
+    };
+
+    updateBidMutation.mutate({ bidId: editBidModal.bid.id, bidData });
+  };
+
+  const handleDeleteBid = (bidId: string) => {
+    if (window.confirm('Are you sure you want to delete this bid?')) {
+      deleteBidMutation.mutate(bidId);
+    }
   };
 
   // Show error if supplier not found
@@ -638,6 +707,7 @@ const SupplierDashboard: React.FC = () => {
                 { id: 'available-orders', name: 'Available Orders', icon: DocumentTextIcon },
                 { id: 'my-bids', name: 'My Bids', icon: ClockIcon },
                 { id: 'active-orders', name: 'Active Orders', icon: TruckIcon },
+                { id: 'past-deliveries', name: 'Past Deliveries', icon: ArchiveBoxIcon },
                 { id: 'manage-products', name: 'Manage Products', icon: PlusIcon }
               ].map((tab) => (
                 <button
@@ -884,9 +954,31 @@ const SupplierDashboard: React.FC = () => {
                         </div>
                       )}
 
-                      <div className="text-sm text-gray-500">
-                        <ClockIcon className="inline h-4 w-4 mr-1" />
-                        Delivery: {formatDate(bid.deliveryTime)} • Valid until: {formatDate(bid.validUntil)}
+                      <div className="flex justify-between items-center">
+                        <div className="text-sm text-gray-500">
+                          <ClockIcon className="inline h-4 w-4 mr-1" />
+                          Delivery: {formatDate(bid.deliveryTime)} • Valid until: {formatDate(bid.validUntil)}
+                        </div>
+                        
+                        {/* Edit/Delete buttons for pending bids */}
+                        {bid.status === 'PENDING' && (
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => setEditBidModal({ isOpen: true, bid })}
+                              className="flex items-center px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                            >
+                              <PencilIcon className="h-4 w-4 mr-1" />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteBid(bid.id)}
+                              className="flex items-center px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+                            >
+                              <TrashIcon className="h-4 w-4 mr-1" />
+                              Delete
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )) || (
@@ -1004,6 +1096,114 @@ const SupplierDashboard: React.FC = () => {
               </div>
             )}
 
+            {/* Past Deliveries Tab */}
+            {activeTab === 'past-deliveries' && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900">Past Deliveries</h3>
+                
+                <div className="space-y-4">
+                  {pastDeliveries?.deliveries?.map((delivery: any) => (
+                    <div key={delivery.id} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h4 className="font-medium text-gray-900">
+                            Delivered to {delivery.vendor?.name}
+                          </h4>
+                          <p className="text-sm text-gray-500">
+                            {delivery.vendor?.businessType} • {delivery.vendor?.businessLocation}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Delivered: {formatDate(delivery.deliveredAt || delivery.updatedAt)}
+                          </p>
+                          {delivery.group && (
+                            <p className="text-sm text-blue-600">
+                              Group Order at {delivery.group.pickupLocation}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-semibold">{formatCurrency(delivery.totalAmount)}</p>
+                          <span className="inline-flex px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
+                            DELIVERED
+                          </span>
+                          <div className="mt-2">
+                            <span className={`inline-flex px-2 py-1 text-xs rounded-full font-medium ${
+                              delivery.paymentMethod === 'UPI' ? 'bg-purple-100 text-purple-800' :
+                              delivery.paymentMethod === 'PAY_LATER' ? 'bg-orange-100 text-orange-800' :
+                              delivery.paymentMethod === 'CASH' ? 'bg-green-100 text-green-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {delivery.paymentMethod === 'PAY_LATER' ? 'Pay Later' : 
+                               delivery.paymentMethod === 'UPI' ? 'UPI Payment' : 
+                               delivery.paymentMethod === 'CASH' ? 'Cash Payment' :
+                               delivery.paymentMethod}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Order Items */}
+                      <div className="mb-4">
+                        <h5 className="text-sm font-medium text-gray-700 mb-2">Items Delivered:</h5>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                          {delivery.items?.map((item: any) => (
+                            <div key={item.id} className="text-sm bg-gray-50 p-2 rounded">
+                              <span className="font-medium">{item.product.name}</span>
+                              <span className="text-gray-500 ml-1">
+                                ({item.quantity} {item.unit})
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Payment Status */}
+                      {delivery.payments && delivery.payments.length > 0 && (
+                        <div className="text-sm text-gray-600">
+                          <strong>Payment Status:</strong> {delivery.payments[0].status}
+                          {delivery.payments[0].method && (
+                            <span className="ml-2">via {delivery.payments[0].method}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )) || (
+                    <div className="text-center py-8">
+                      <ArchiveBoxIcon className="mx-auto h-12 w-12 text-gray-400" />
+                      <h3 className="mt-4 text-lg font-medium text-gray-900">No past deliveries</h3>
+                      <p className="mt-2 text-sm text-gray-500">
+                        Your completed deliveries will appear here.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Pagination */}
+                {pastDeliveries?.pagination && pastDeliveries.pagination.totalPages > 1 && (
+                  <div className="flex justify-center mt-6">
+                    <nav className="flex space-x-2">
+                      {Array.from({ length: pastDeliveries.pagination.totalPages }, (_, i) => i + 1).map((page) => (
+                        <button
+                          key={page}
+                          onClick={() => {
+                            // Refetch with new page
+                            queryClient.invalidateQueries(['pastDeliveries', currentSupplierId]);
+                          }}
+                          className={`px-3 py-2 text-sm rounded-md ${
+                            page === pastDeliveries.pagination.page
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                    </nav>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Manage Products Tab */}
             {activeTab === 'manage-products' && (
               <ManageProductsTab supplierId={currentSupplierId} />
@@ -1089,6 +1289,94 @@ const SupplierDashboard: React.FC = () => {
                     className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
                   >
                     {createBidMutation.isLoading ? 'Submitting...' : 'Submit Bid'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Bid Modal */}
+        {editBidModal.isOpen && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 shadow-lg rounded-md bg-white">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Edit Bid</h3>
+                <button
+                  onClick={() => setEditBidModal({ isOpen: false, bid: null })}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                <h4 className="font-medium">{editBidModal.bid?.order?.vendor?.name}</h4>
+                <p className="text-sm text-gray-600">
+                  {editBidModal.bid?.order?.vendor?.businessType} • {editBidModal.bid?.order?.vendor?.businessLocation}
+                </p>
+                <p className="text-sm font-medium">
+                  Current Bid: {formatCurrency(editBidModal.bid?.totalAmount)}
+                </p>
+              </div>
+
+              <form onSubmit={handleEditBidSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Your Bid Amount (₹) *
+                  </label>
+                  <input
+                    type="number"
+                    name="totalAmount"
+                    required
+                    step="0.01"
+                    min="1"
+                    defaultValue={editBidModal.bid?.totalAmount}
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter your competitive price"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Delivery Date & Time *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    name="deliveryTime"
+                    required
+                    defaultValue={editBidModal.bid?.deliveryTime ? new Date(editBidModal.bid.deliveryTime).toISOString().slice(0, 16) : ''}
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Message (Optional)
+                  </label>
+                  <textarea
+                    name="message"
+                    rows={3}
+                    defaultValue={editBidModal.bid?.message}
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Any special notes or terms..."
+                  />
+                </div>
+
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditBidModal({ isOpen: false, bid: null })}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updateBidMutation.isLoading}
+                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {updateBidMutation.isLoading ? 'Updating...' : 'Update Bid'}
                   </button>
                 </div>
               </form>
