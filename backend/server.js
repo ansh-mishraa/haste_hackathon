@@ -68,17 +68,27 @@ const limiter = rateLimit({
 
 app.use(limiter);
 
-// CORS configuration - Fixed for better frontend-backend communication
+const allowedOrigins = [
+  process.env.CLIENT_URL || "http://localhost:3000",
+  "http://localhost:3001",
+  "http://localhost:3002"
+];
+
 app.use(cors({
-  origin: [
-    process.env.CLIENT_URL || "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:3002"
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error("CORS not allowed from origin: " + origin));
+    }
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
 }));
+
 
 // Compression middleware
 app.use(compression());
@@ -135,7 +145,7 @@ async function startServer() {
       console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🔗 Health check: http://localhost:${PORT}/health`);
       console.log(`🌐 Open website - no authentication required`);
-      console.log(`📊 CORS enabled for: ${process.env.CLIENT_URL || "http://localhost:3000"}`);
+      console.log(`📊 CORS enabled for: ${process.env.CLIENT_URL}`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
