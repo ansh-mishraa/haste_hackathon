@@ -9,7 +9,9 @@
     "test": "jest",
     "lint": "eslint .",
     "db:migrate": "npx prisma migrate dev",
-    "db:seed": "node scripts/seed.js"
+    "db:seed": "node scripts/seed.js",
+    "build": "npm install && npx prisma generate",
+    "postinstall": "npx prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.12.0",
