@@ -38,7 +38,7 @@ const ManageProductsTab: React.FC<{ supplierId: string }> = ({ supplierId }) => 
   const { data: supplierProducts, isLoading: isLoadingProducts } = useQuery(
     ['supplierProducts', supplierId],
     async () => {
-      const response = await axios.get(`http://localhost:5000/api/products/supplier/${supplierId}`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/products/supplier/${supplierId}`);
       return response.data;
     },
     { enabled: !!supplierId }
@@ -47,7 +47,7 @@ const ManageProductsTab: React.FC<{ supplierId: string }> = ({ supplierId }) => 
   // Create product mutation
   const createProductMutation = useMutation(
     async (productData: any) => {
-      const response = await axios.post(`http://localhost:5000/api/products/supplier/${supplierId}`, productData);
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/products/supplier/${supplierId}`, productData);
       return response.data;
     },
     {
@@ -323,7 +323,7 @@ const SupplierDashboard: React.FC = () => {
   const { data: dashboardData, isLoading: isDashboardLoading, error } = useQuery(
     ['supplierDashboard', currentSupplierId],
     async () => {
-      const response = await axios.get(`http://localhost:5000/api/suppliers/${currentSupplierId}/dashboard`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/suppliers/${currentSupplierId}/dashboard`);
       return response.data;
     },
     {
@@ -343,7 +343,7 @@ const SupplierDashboard: React.FC = () => {
   const { data: supplier } = useQuery(
     ['supplier', currentSupplierId],
     async () => {
-      const response = await axios.get(`http://localhost:5000/api/suppliers/${currentSupplierId}`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/suppliers/${currentSupplierId}`);
       return response.data;
     },
     { 
@@ -362,7 +362,7 @@ const SupplierDashboard: React.FC = () => {
   const { data: availableOrders } = useQuery(
     ['availableOrders', currentSupplierId],
     async () => {
-      const response = await axios.get(`http://localhost:5000/api/suppliers/${currentSupplierId}/available-orders`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/suppliers/${currentSupplierId}/available-orders`);
       return response.data;
     },
     { enabled: shouldEnableQueries && !!currentSupplierId }
@@ -372,7 +372,7 @@ const SupplierDashboard: React.FC = () => {
   const { data: supplierBids } = useQuery(
     ['supplierBids', currentSupplierId],
     async () => {
-      const response = await axios.get(`http://localhost:5000/api/suppliers/${currentSupplierId}/bids`);
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/suppliers/${currentSupplierId}/bids`);
       return response.data;
     },
     { enabled: shouldEnableQueries && !!currentSupplierId }
@@ -415,7 +415,7 @@ const SupplierDashboard: React.FC = () => {
   // Create bid mutation
   const createBidMutation = useMutation(
     async (bidData: any) => {
-      const response = await axios.post(`http://localhost:5000/api/suppliers/bids`, bidData);
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/suppliers/bids`, bidData);
       return response.data;
     },
     {
@@ -434,7 +434,7 @@ const SupplierDashboard: React.FC = () => {
   // Update order status mutation
   const updateOrderStatusMutation = useMutation(
     async ({ orderId, status }: { orderId: string; status: string }) => {
-      const response = await axios.put(`http://localhost:5000/api/orders/${orderId}/status`, {
+      const response = await axios.put(`${process.env.REACT_APP_API_URL}/api/orders/${orderId}/status`, {
         status,
         supplierId: currentSupplierId
       });
